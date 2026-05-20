@@ -1,10 +1,14 @@
 public class ConsumoFrigobar {
 
-    // REUTILIZAR CLASSE PRODUTOFRIGOBAR!!!!
-    
-    private double quarto;
-    private String produto;
-    private double quantidadeConsumida;
+    private Quarto quarto;
+    private ProdutoFrigobar produto;
+    private int quantidadeConsumida;
+
+    public ConsumoFrigobar(Quarto quarto, ProdutoFrigobar produto, int quantidadeConsumida) {
+        this.quarto = quarto;
+        this.produto = produto;
+        this.quantidadeConsumida = quantidadeConsumida;
+    }
 
     public void registrarConsumo() {
         int estoqueAtual = produto.getQuantidade();
@@ -18,17 +22,14 @@ public class ConsumoFrigobar {
         System.out.println("  Consumo registrado com sucesso! Valor: R$ " + String.format("%.2f", valor));
     }
 
-
     public double calcularValorConsumo() {
-        // Delega o calculo ao ProdutoFrigobar (reutilizacao de codigo)
         return produto.calcularTotal(quantidadeConsumida);
     }
-
 
     public void exibirConsumo() {
         System.out.println("  Quarto  : " + quarto.getNumero());
         System.out.println("  Produto : " + produto.getNomeProduto());
         System.out.println("  Qtd     : " + quantidadeConsumida);
-        System.out.printf ("  Valor   : R$ %.2f%n", calcularValorConsumo());
+        System.out.printf("  Valor   : R$ %.2f%n", calcularValorConsumo());
     }
 }

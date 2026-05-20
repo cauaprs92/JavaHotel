@@ -2,12 +2,12 @@ public class ProdutoFrigobar {
 
     private String nomeProduto;
     private double preco;
-    private double quantidade;
+    private int quantidade;
     
     public ProdutoFrigobar(){
 
     }
-    public ProdutoFrigobar(String nomeProduto, double preco, double quantidade){
+    public ProdutoFrigobar(String nomeProduto, double preco, int quantidade){
         this.nomeProduto = nomeProduto;
         this.preco = preco;
         this.quantidade = quantidade;
@@ -30,10 +30,10 @@ public class ProdutoFrigobar {
     public void setPreco(double preco){
         this.preco = preco;
     } 
-    public double getQuantidade(){
+    public int getQuantidade(){
         return quantidade;
     } 
-    public void setQuantidade(double quantidade){
+    public void setQuantidade(int quantidade){
         this.quantidade = quantidade;
     }
 
