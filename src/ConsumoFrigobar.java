@@ -4,6 +4,15 @@ public class ConsumoFrigobar {
     private ProdutoFrigobar produto;
     private int quantidadeConsumida;
 
+    public ConsumoFrigobar(){
+    }
+
+    public ConsumoFrigobar(Quarto quarto, ProdutoFrigobar produto) {
+        this.quarto = quarto;
+        this.produto = produto;
+        this.quantidadeConsumida = 0;
+    }
+    
     public ConsumoFrigobar(Quarto quarto, ProdutoFrigobar produto, int quantidadeConsumida) {
         this.quarto = quarto;
         this.produto = produto;

@@ -1,17 +1,28 @@
 public class Quarto {
  
+    //encapsulamento de atributos
     private int numero;
     private boolean ocupado;
     private Hospede hospede;
     private double valorConsumido;
- 
+    
+    public Quarto(){
+    }
+
     public Quarto(int numero) {
         this.numero = numero;
         this.ocupado = false;
         this.hospede = null;
         this.valorConsumido = 0.0;
     }
- 
+
+    public Quarto(int numero, int valorConsumido) {
+        this.numero = numero;
+        this.ocupado = false;
+        this.hospede = null;
+        this.valorConsumido = valorConsumido;
+    } 
+
     // Getters e Setters
     public int getNumero() {
         return numero;
