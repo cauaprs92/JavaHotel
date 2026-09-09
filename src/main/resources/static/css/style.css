@@ -1,0 +1,167 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f2f4f7;
+    color: #1f2933;
+}
+
+header {
+    background: #1d3557;
+    color: #fff;
+    padding: 24px 32px;
+}
+
+header h1 {
+    margin: 0 0 4px 0;
+}
+
+header p {
+    margin: 0;
+    opacity: 0.8;
+}
+
+main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+}
+
+.alerta {
+    background: #e9f5ec;
+    border: 1px solid #57ab5a;
+    color: #1e4620;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.cartoes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.cartao {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.cartao h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+form label {
+    display: block;
+    font-size: 0.85rem;
+    margin: 10px 0 4px;
+    color: #52606d;
+}
+
+form input,
+form select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #cbd2d9;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+button {
+    margin-top: 16px;
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #1d3557;
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #16283f;
+}
+
+.botao-secundario {
+    background: #c0392b;
+}
+
+.botao-secundario:hover {
+    background: #992d22;
+}
+
+section h2 {
+    border-bottom: 2px solid #1d3557;
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+}
+
+.grade-quartos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    margin-bottom: 32px;
+}
+
+.quarto {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 6px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.8rem;
+    gap: 2px;
+}
+
+.quarto.livre {
+    background: #e3fcef;
+    border: 1px solid #57ab5a;
+    color: #1e4620;
+}
+
+.quarto.ocupado {
+    background: #fdecea;
+    border: 1px solid #c0392b;
+    color: #7b241c;
+}
+
+.quarto strong {
+    font-size: 1.1rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e4e7eb;
+}
+
+thead {
+    background: #1d3557;
+    color: #fff;
+}
+
+footer {
+    text-align: center;
+    padding: 16px;
+    color: #7b8794;
+    font-size: 0.85rem;
+}

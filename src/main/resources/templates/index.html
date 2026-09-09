@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Hotel Java - Painel</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+    <header>
+        <h1>Hotel Java</h1>
+        <p>Sistema de reservas e frigobar</p>
+    </header>
+
+    <main>
+
+        <div th:if="${mensagem}" class="alerta" th:text="${mensagem}"></div>
+
+        <section class="cartoes">
+
+            <div class="cartao">
+                <h2>Reservar Quarto</h2>
+                <form th:action="@{/reservar}" method="post">
+                    <label>Numero do quarto</label>
+                    <input type="number" name="numero" min="1" required>
+
+                    <label>Nome do hospede</label>
+                    <input type="text" name="nome" required>
+
+                    <label>E-mail</label>
+                    <input type="email" name="email" required>
+
+                    <label>Telefone</label>
+                    <input type="text" name="telefone" required>
+
+                    <button type="submit">Reservar</button>
+                </form>
+            </div>
+
+            <div class="cartao">
+                <h2>Cancelar Reserva</h2>
+                <form th:action="@{/cancelar}" method="post">
+                    <label>Numero do quarto</label>
+                    <input type="number" name="numero" min="1" required>
+
+                    <button type="submit" class="botao-secundario">Cancelar</button>
+                </form>
+            </div>
+
+            <div class="cartao">
+                <h2>Registrar Consumo no Frigobar</h2>
+                <form th:action="@{/consumo}" method="post">
+                    <label>Numero do quarto</label>
+                    <input type="number" name="numero" min="1" required>
+
+                    <label>Produto</label>
+                    <select name="produto" required>
+                        <option th:each="prod, iter : ${produtos}"
+                                th:value="${iter.index}"
+                                th:text="${prod.nomeProduto} + ' - R$ ' + ${prod.preco}">
+                        </option>
+                    </select>
+
+                    <label>Quantidade</label>
+                    <input type="number" name="quantidade" min="1" required>
+
+                    <button type="submit">Registrar</button>
+                </form>
+            </div>
+
+        </section>
+
+        <section>
+            <h2>Mapa de Quartos</h2>
+            <div class="grade-quartos">
+                <div class="quarto"
+                     th:each="q : ${quartos}"
+                     th:classappend="${q.ocupado} ? 'ocupado' : 'livre'">
+                    <strong th:text="${q.numero}"></strong>
+                    <span th:if="${q.ocupado}" th:text="${q.hospede.nome}"></span>
+                    <span th:if="${q.ocupado}" th:text="'R$ ' + ${#numbers.formatDecimal(q.valorConsumido, 1, 2)}"></span>
+                    <span th:unless="${q.ocupado}">Livre</span>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Produtos do Frigobar</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Preco</th>
+                        <th>Estoque</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="prod : ${produtos}">
+                        <td th:text="${prod.nomeProduto}"></td>
+                        <td th:text="'R$ ' + ${#numbers.formatDecimal(prod.preco, 1, 2)}"></td>
+                        <td th:text="${prod.quantidade}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>Projeto de estudos - Spring Boot + Thymeleaf</p>
+    </footer>
+
+</body>
+</html>
