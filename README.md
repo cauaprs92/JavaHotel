@@ -1,119 +1,66 @@
-# JavaHotel
+<div align="center">
 
-Projeto de estudos de Java: um sistema de reservas de hotel com frigobar, feito em duas versões:
+# 🏨 JavaHotel
 
-1. **`console-app/`** — a versão original, em Java puro, rodando no terminal.
-2. **`src/main/`** — a mesma ideia reescrita como aplicação web com **Spring Boot** + **Thymeleaf**, para estudar o framework.
+### Sistema de reservas de hotel com frigobar
 
-Nenhuma versão depende da outra. São dois exercícios lado a lado no mesmo repositório.
+<a href="https://javahotel-peach.vercel.app/">
+  <img src="https://img.shields.io/badge/🌐_ACESSAR_SITE-javahotel--peach.vercel.app-2563eb?style=for-the-badge&labelColor=0f172a" alt="Acessar site" />
+</a>
+
+<br/><br/>
+
+[![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)](https://developer.mozilla.org/docs/Web/HTML)
+[![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)](https://developer.mozilla.org/docs/Web/CSS)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
+[![Java](https://img.shields.io/badge/Java-25-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org)
+[![Deploy](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://javahotel-peach.vercel.app/)
+
+</div>
 
 ---
 
-## Estrutura do projeto
+## 🔗 Link de acesso
+
+<div align="center">
+
+**Aplicação em produção:** [javahotel-peach.vercel.app](https://javahotel-peach.vercel.app/)
+
+</div>
+
+> O projeto é publicado exclusivamente na Vercel. Não há instruções para execução local.
+
+---
+
+## ✨ O que dá pra fazer no site
+
+- ✅ Reservar um quarto (número, nome, e-mail e telefone)
+- ✅ Cancelar uma reserva
+- ✅ Registrar consumo de um produto do frigobar em um quarto ocupado
+- ✅ Ver o mapa de quartos (ocupado/livre) e o estoque do frigobar
+
+> Os dados ficam salvos apenas no navegador de quem usa (`localStorage`). Não há banco de dados nem compartilhamento entre usuários.
+
+---
+
+## 🧱 Estrutura do projeto
 
 ```
 JavaHotel/
-├── console-app/              # Versão console (Java puro, sem Maven)
-│   ├── Main.java             # Menu principal (loop + switch)
-│   ├── Hotel.java            # Regras de negócio e leitura do teclado
-│   ├── Quarto.java           # Modelo: quarto, ocupação, consumo
-│   ├── Hospede.java          # Modelo: dados do hóspede
-│   ├── ProdutoFrigobar.java  # Modelo: produto do frigobar
-│   └── ConsumoFrigobar.java  # Registra o consumo de um produto num quarto
+├── public/                   # Site publicado na Vercel (estático)
+│   ├── index.html            # Página do painel
+│   ├── app.js                # Regras de reservas e frigobar
+│   └── css/style.css         # Estilo da página
 │
-├── src/main/                 # Versão web (Spring Boot)
-│   ├── java/com/hotel/
-│   │   ├── HotelApplication.java      # Ponto de entrada (main)
-│   │   ├── controller/
-│   │   │   └── HotelController.java   # Recebe requisições HTTP (rotas)
-│   │   ├── service/
-│   │   │   └── HotelService.java      # Regras de negócio (em memória)
-│   │   └── model/
-│   │       ├── Quarto.java
-│   │       ├── Hospede.java
-│   │       └── ProdutoFrigobar.java
-│   └── resources/
-│       ├── application.properties     # Configurações (porta, etc.)
-│       ├── templates/index.html       # Página HTML (Thymeleaf)
-│       └── static/css/style.css       # Estilo da página
-│
-├── pom.xml                   # Configuração do Maven (dependências do Spring)
-├── mvnw / mvnw.cmd           # Maven Wrapper — não precisa instalar o Maven
-└── .vscode/settings.json     # Configuração do VS Code para o console-app
+├── src/main/                 # Versão original em Spring Boot + Thymeleaf (referência de estudo)
+├── console-app/              # Versão original em Java puro para terminal (referência de estudo)
+└── pom.xml                   # Configuração Maven da versão Spring Boot
 ```
+
+O projeto nasceu como estudo de Java em três formatos: console (Java puro), web com Spring Boot + Thymeleaf e, por fim, a versão estática em `public/`, que é a publicada. As três implementam as mesmas regras de negócio (quartos, hóspedes e frigobar); o código Java foi mantido apenas como referência de estudo.
 
 ---
 
-## Versão 1: Console (`console-app/`)
+## 🚀 Deploy
 
-Aplicação de terminal simples, sem frameworks — só Java e orientação a objetos.
-
-**Como rodar (dentro da pasta `console-app/`):**
-```bash
-javac *.java -d bin
-java -cp bin Main
-```
-
-Ou use o botão "Run" do VS Code diretamente no `Main.java`.
-
-Fluxo: um menu numerado (`1` a `8`) permite reservar quarto, cancelar reserva, listar hóspedes, registrar consumo de frigobar, etc. Tudo fica guardado apenas na memória enquanto o programa roda.
-
----
-
-## Versão 2: Web com Spring Boot (`src/main/`)
-
-A mesma lógica (quartos, hóspedes, frigobar), só que exposta como página web.
-
-### Como rodar
-
-Na raiz do projeto:
-```bash
-./mvnw spring-boot:run
-```
-
-Depois abra no navegador:
-```
-http://localhost:8081
-```
-
-> A porta é `8081` (não `8080`) porque, no ambiente de estudo original, a `8080` já estava sendo usada por outro programa. Se quiser mudar, edite `server.port` em `src/main/resources/application.properties`.
-
-Para parar o servidor, use `Ctrl+C` no terminal onde ele está rodando.
-
-### Como a aplicação está organizada (padrão MVC do Spring)
-
-```
-Navegador  →  Controller  →  Service  →  Model
-   ↑                                        │
-   └──────────── View (HTML) ◄──────────────┘
-```
-
-- **`HotelController`** — recebe as requisições HTTP (`GET /`, `POST /reservar`, etc.) e decide qual página mostrar.
-- **`HotelService`** — contém as regras de negócio: reservar, cancelar, registrar consumo. É aqui que fica a "lógica" do hotel.
-- **`model/`** — classes simples que representam os dados (`Quarto`, `Hospede`, `ProdutoFrigobar`).
-- **`templates/index.html`** — a página vista pelo usuário, escrita com **Thymeleaf** (permite usar `th:each`, `th:if`, etc. para gerar HTML dinâmico a partir dos dados do Java).
-
-### O que dá pra fazer na página
-
-- Reservar um quarto (número, nome, e-mail, telefone)
-- Cancelar uma reserva
-- Registrar consumo de um produto do frigobar em um quarto ocupado
-- Ver o mapa de quartos (ocupado/livre) e a lista de produtos do frigobar em tempo real
-
-> Atenção: os dados ficam só na memória (uma `List` dentro do `HotelService`). Se você reiniciar a aplicação, tudo volta ao estado inicial — não há banco de dados.
-
-### Pontos para estudar no código
-
-- `@SpringBootApplication` em `HotelApplication.java` — liga tudo (auto-configuração + escaneamento de componentes).
-- `@Controller`, `@GetMapping`, `@PostMapping` em `HotelController.java` — como o Spring mapeia URLs para métodos Java.
-- `@Autowired` — como o Spring injeta o `HotelService` dentro do `HotelController` automaticamente (Injeção de Dependência).
-- `RedirectAttributes` + `redirect:/` — o padrão Post/Redirect/Get, usado para evitar reenvio de formulário ao atualizar a página.
-- `th:each`, `th:if`, `th:text` em `index.html` — como o Thymeleaf percorre listas e mostra dados vindos do `Model`.
-
----
-
-## Requisitos
-
-- JDK 17 ou superior (para rodar a versão Spring Boot)
-- JDK 8 ou superior (para rodar a versão console)
-- Não precisa instalar o Maven — o projeto já inclui o `mvnw` (Maven Wrapper)
+A pasta `public/` é servida como site estático na Vercel, sem etapa de build.
