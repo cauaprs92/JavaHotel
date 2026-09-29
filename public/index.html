@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hotel Java - Painel</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Hotel Java</h1>
+        <p>Sistema de reservas e frigobar</p>
+    </header>
+
+    <main>
+
+        <div id="alerta" class="alerta" hidden></div>
+
+        <section class="cartoes">
+
+            <div class="cartao">
+                <h2>Reservar Quarto</h2>
+                <form id="form-reservar">
+                    <label>Numero do quarto</label>
+                    <input type="number" name="numero" min="1" required>
+
+                    <label>Nome do hospede</label>
+                    <input type="text" name="nome" required>
+
+                    <label>E-mail</label>
+                    <input type="email" name="email" required>
+
+                    <label>Telefone</label>
+                    <input type="text" name="telefone" required>
+
+                    <button type="submit">Reservar</button>
+                </form>
+            </div>
+
+            <div class="cartao">
+                <h2>Cancelar Reserva</h2>
+                <form id="form-cancelar">
+                    <label>Numero do quarto</label>
+                    <input type="number" name="numero" min="1" required>
+
+                    <button type="submit" class="botao-secundario">Cancelar</button>
+                </form>
+            </div>
+
+            <div class="cartao">
+                <h2>Registrar Consumo no Frigobar</h2>
+                <form id="form-consumo">
+                    <label>Numero do quarto</label>
+                    <input type="number" name="numero" min="1" required>
+
+                    <label>Produto</label>
+                    <select name="produto" id="select-produto" required></select>
+
+                    <label>Quantidade</label>
+                    <input type="number" name="quantidade" min="1" required>
+
+                    <button type="submit">Registrar</button>
+                </form>
+            </div>
+
+        </section>
+
+        <section>
+            <h2>Mapa de Quartos</h2>
+            <div class="grade-quartos" id="grade-quartos"></div>
+        </section>
+
+        <section>
+            <h2>Produtos do Frigobar</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Preco</th>
+                        <th>Estoque</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-produtos"></tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>Projeto de estudos - versao estatica (dados salvos no navegador)</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
