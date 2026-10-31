@@ -35,22 +35,8 @@
 
             <section class="cartao">
                 <h2>Nova reserva</h2>
-                <p class="descricao">Escolha as datas: só aparecem os quartos livres no período. Toda reserva começa com o status Agendado até o check-in.</p>
+                <p class="descricao">O quarto só aparece se estiver livre nas datas escolhidas. Toda reserva começa com o status Agendado até o check-in.</p>
                 <form id="form-reservar">
-                    <div class="campos-reserva">
-                        <div class="campo">
-                            <label for="nova-entrada">Check-in</label>
-                            <input id="nova-entrada" type="date" name="entrada" required>
-                        </div>
-                        <div class="campo">
-                            <label for="nova-saida">Check-out</label>
-                            <input id="nova-saida" type="date" name="saida" required>
-                        </div>
-                        <div class="campo">
-                            <label for="sel-quarto-livre">Quarto</label>
-                            <select id="sel-quarto-livre" name="numero" required></select>
-                        </div>
-                    </div>
                     <div class="campos-reserva">
                         <div class="campo">
                             <label for="nome">Nome do hóspede</label>
@@ -63,6 +49,20 @@
                         <div class="campo">
                             <label for="telefone">Telefone</label>
                             <input id="telefone" type="tel" name="telefone" autocomplete="tel" placeholder="(11) 90000-0000" required>
+                        </div>
+                    </div>
+                    <div class="campos-reserva">
+                        <div class="campo">
+                            <label for="nova-entrada">Check-in</label>
+                            <input id="nova-entrada" type="date" name="entrada" required>
+                        </div>
+                        <div class="campo">
+                            <label for="nova-saida">Check-out</label>
+                            <input id="nova-saida" type="date" name="saida" required>
+                        </div>
+                        <div class="campo">
+                            <label for="sel-quarto-livre">Quarto</label>
+                            <select id="sel-quarto-livre" name="numero" required></select>
                         </div>
                     </div>
                     <div class="form-rodape">
