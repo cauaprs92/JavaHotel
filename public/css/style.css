@@ -455,13 +455,20 @@ main {
 
 .segmentado {
     display: inline-flex;
+    max-width: 100%;
     padding: 4px;
     background: var(--surface-2);
     border-radius: 999px;
     gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
+.segmentado::-webkit-scrollbar { display: none; }
+
 .segmentado button {
+    flex-shrink: 0;
+    white-space: nowrap;
     border: none;
     background: transparent;
     color: var(--muted);
@@ -502,7 +509,8 @@ main {
     flex-shrink: 0;
 }
 
-.ponto.ocupado { background: var(--busy); }
+.ponto.agendada { background: var(--brass); }
+.ponto.hospedada { background: var(--busy); }
 
 .andar + .andar { margin-top: 36px; }
 
@@ -552,9 +560,15 @@ main {
     border-color: var(--brass);
 }
 
-.quarto.ocupado {
+.quarto.hospedada {
     background:
         linear-gradient(180deg, var(--busy-bg), transparent 70%),
+        var(--surface);
+}
+
+.quarto.agendada {
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--brass) 12%, transparent), transparent 70%),
         var(--surface);
 }
 
@@ -596,12 +610,47 @@ main {
 
 .quarto .ponto { width: 9px; height: 9px; }
 
-.quarto:not(.ocupado) .ponto {
-    box-shadow: 0 0 0 4px var(--free-bg);
+.quarto.livre .ponto { box-shadow: 0 0 0 4px var(--free-bg); }
+.quarto.agendada .ponto { box-shadow: 0 0 0 4px color-mix(in srgb, var(--brass) 18%, transparent); }
+.quarto.hospedada .ponto { box-shadow: 0 0 0 4px var(--busy-bg); }
+
+/* ---------- Status da reserva ---------- */
+
+.selo-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
-.quarto.ocupado .ponto {
-    box-shadow: 0 0 0 4px var(--busy-bg);
+.selo-status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.selo-status.agendada {
+    color: var(--brass);
+    background: color-mix(in srgb, var(--brass) 15%, transparent);
+}
+
+.selo-status.hospedada {
+    color: var(--busy);
+    background: var(--busy-bg);
+}
+
+.selo-status.finalizada {
+    color: var(--muted);
+    background: var(--surface-2);
 }
 
 .selo {
@@ -625,7 +674,6 @@ main {
     background: currentColor;
 }
 
-.selo.ocupado { background: var(--busy-bg); color: var(--busy); }
 .selo.alerta { background: var(--busy-bg); color: var(--busy); }
 
 /* ---------- Diálogo de detalhes ---------- */
@@ -868,7 +916,7 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 /* Card largo: número | hóspede | andar e frigobar | ações */
 .reserva {
     display: grid;
-    grid-template-columns: 2.6rem minmax(0, 1fr) 270px auto;
+    grid-template-columns: 2.6rem minmax(0, 1fr) 300px auto;
     grid-template-areas: "num quem info acoes";
     gap: 0 28px;
     align-items: center;
@@ -907,13 +955,114 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 
 .reserva-quem { grid-area: quem; display: block; min-width: 0; }
 
+.reserva-titulo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    margin-bottom: 3px;
+}
+
 .reserva-nome {
     display: block;
+    min-width: 0;
     font-weight: 600;
-    margin-bottom: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.reserva.finalizada .reserva-num { color: var(--muted); }
+.reserva.finalizada .reserva-nome { color: var(--muted); }
+
+.abas-status { margin-bottom: 14px; }
+
+/* Diálogo da reserva: título com status, faixa de check-in e pagamento */
+
+.titulo-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.faixa-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin: -4px 0 22px;
+    padding: 12px 12px 12px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.faixa-status.agendada { background: color-mix(in srgb, var(--brass) 12%, transparent); color: var(--ink); }
+.faixa-status.hospedada { background: var(--busy-bg); color: var(--ink); }
+
+.botao.pequeno {
+    flex-shrink: 0;
+    height: 38px;
+    padding: 0 18px;
+    font-size: 0.86rem;
+}
+
+.pagamento {
+    margin: -6px 0 24px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+}
+
+.pagamento-linha {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.pagamento-linha strong {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+label.checagem {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 14px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 0.9rem;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+label.checagem input {
+    appearance: auto;
+    -webkit-appearance: checkbox;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    padding: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.pagamento-nota {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 0.86rem;
 }
 
 .reserva-contato {
@@ -1396,6 +1545,8 @@ td .quarto-mini {
     .reservas { grid-template-columns: 1fr; }
     .form-rodape .botao { width: 100%; }
     .dialogo-acoes { flex-direction: column-reverse; }
+    .faixa-status { flex-direction: column; align-items: stretch; }
+    .reserva-titulo { flex-wrap: wrap; row-gap: 4px; }
     .filtros-reservas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #filtro-ordem { grid-column: 1 / -1; }
     .busca input { font-size: 0.9rem; padding-right: 8px; }

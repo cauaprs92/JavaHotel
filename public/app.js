@@ -2,6 +2,12 @@
    JavaHotel — regras de reservas e frigobar
    Os dados ficam no localStorage do navegador.
    Cada página chama sua função pelo atributo data-page do <body>.
+
+   Ciclo de uma reserva:
+     agendada  → (check-in)              → hospedada
+     hospedada → (encerrar + pagamento)  → finalizada
+     agendada  → (cancelar agendamento)  → removida
+   Um quarto está ocupado enquanto tiver uma reserva agendada ou hospedada.
    ========================================================== */
 
 const TOTAL_QUARTOS = 20;
@@ -10,13 +16,12 @@ const ESTOQUE_REFERENCIA = 20;
 const ESTOQUE_BAIXO = 5;
 const STORAGE_KEY = "javahotel-estado";
 
+const STATUS = { agendada: "Agendada", hospedada: "Hospedada", finalizada: "Finalizada" };
+const ORDEM_STATUS = { agendada: 0, hospedada: 1, finalizada: 2 };
+
 /* ---------- Estado ---------- */
 
 function estadoInicial() {
-    const quartos = [];
-    for (let i = 1; i <= TOTAL_QUARTOS; i++) {
-        quartos.push({ numero: i, ocupado: false, hospede: null, valorConsumido: 0 });
-    }
     const produtos = [
         { nomeProduto: "Água Mineral 500ml", preco: 3.5, quantidade: 20 },
         { nomeProduto: "Refrigerante Lata", preco: 6.0, quantidade: 15 },
@@ -24,13 +29,36 @@ function estadoInicial() {
         { nomeProduto: "Cerveja Long Neck", preco: 9.0, quantidade: 12 },
         { nomeProduto: "Chocolate ao Leite", preco: 5.5, quantidade: 18 },
     ];
-    return { quartos, produtos };
+    return { versao: 2, proximoId: 1, reservas: [], produtos };
+}
+
+/** Versão antiga guardava o hóspede direto no quarto: vira reserva "hospedada". */
+function migrar(salvo) {
+    if (Array.isArray(salvo.reservas) || !Array.isArray(salvo.quartos)) return salvo;
+    const agora = new Date().toISOString();
+    let id = 1;
+    const reservas = salvo.quartos
+        .filter((q) => q.ocupado && q.hospede)
+        .map((q) => ({
+            id: id++,
+            quarto: q.numero,
+            hospede: { ...q.hospede },
+            status: "hospedada",
+            valorConsumido: q.valorConsumido || 0,
+            criadaEm: agora,
+            checkinEm: agora,
+            finalizadaEm: null,
+        }));
+    return { versao: 2, proximoId: id, reservas, produtos: salvo.produtos };
 }
 
 function carregar() {
     try {
         const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (salvo && Array.isArray(salvo.quartos) && Array.isArray(salvo.produtos)) return salvo;
+        if (salvo && Array.isArray(salvo.produtos)) {
+            const atual = migrar(salvo);
+            if (Array.isArray(atual.reservas)) return atual;
+        }
     } catch (e) { /* storage indisponível ou corrompido */ }
     return estadoInicial();
 }
@@ -41,66 +69,95 @@ function salvar() {
 
 let estado = carregar();
 
+/* ---------- Consultas ---------- */
+
+const ativa = (r) => r.status !== "finalizada";
+const quartoValido = (n) => Number.isInteger(n) && n >= 1 && n <= TOTAL_QUARTOS;
+const buscarReserva = (id) => estado.reservas.find((r) => r.id === id) || null;
+const reservaDoQuarto = (numero) => estado.reservas.find((r) => r.quarto === numero && ativa(r)) || null;
+const comStatus = (status) => estado.reservas.filter((r) => r.status === status);
+const porQuarto = (a, b) => a.quarto - b.quarto;
+
+/** Situação de cada quarto, calculada a partir das reservas ativas. */
+function quartos() {
+    return Array.from({ length: TOTAL_QUARTOS }, (_, i) => {
+        const numero = i + 1;
+        const reserva = reservaDoQuarto(numero);
+        return { numero, reserva, situacao: reserva ? reserva.status : "livre" };
+    });
+}
+const livres = () => quartos().filter((q) => !q.reserva);
+
 /* ---------- Regras ---------- */
 
 const ok = (msg) => ({ ok: true, msg });
 const erro = (msg) => ({ ok: false, msg });
-
-function buscarQuarto(numero) {
-    return estado.quartos.find((q) => q.numero === numero) || null;
-}
+const agora = () => new Date().toISOString();
 
 function reservar(numero, nome, email, telefone) {
-    const q = buscarQuarto(numero);
-    if (!q) return erro("Escolha um quarto válido.");
-    if (q.ocupado) return erro(`O quarto ${numero} já está ocupado.`);
-    q.ocupado = true;
-    q.hospede = { nome, email, telefone };
-    q.valorConsumido = 0;
-    return ok(`Quarto ${numero} reservado para ${nome}.`);
-}
-
-function cancelar(numero) {
-    const q = buscarQuarto(numero);
-    if (!q) return erro("Escolha um quarto válido.");
-    if (!q.ocupado) return erro(`O quarto ${numero} já está livre.`);
-    q.ocupado = false;
-    q.hospede = null;
-    q.valorConsumido = 0;
-    return ok(`Reserva do quarto ${numero} encerrada.`);
-}
-
-/** Atualiza os dados do hóspede e, se pedido, troca de quarto levando o consumo junto. */
-function editarReserva(numeroAtual, novoNumero, nome, email, telefone) {
-    const q = buscarQuarto(numeroAtual);
-    if (!q || !q.ocupado) return erro("Essa reserva não existe mais.");
+    if (!quartoValido(numero)) return erro("Escolha um quarto válido.");
+    if (reservaDoQuarto(numero)) return erro(`O quarto ${numero} já está reservado.`);
     if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
+    estado.reservas.push({
+        id: estado.proximoId++,
+        quarto: numero,
+        hospede: { nome, email, telefone },
+        status: "agendada",
+        valorConsumido: 0,
+        criadaEm: agora(),
+        checkinEm: null,
+        finalizadaEm: null,
+    });
+    return ok(`Reserva agendada no quarto ${numero} para ${nome}.`);
+}
 
-    const hospede = { nome, email, telefone };
-    if (novoNumero === numeroAtual) {
-        q.hospede = hospede;
-        return ok(`Reserva do quarto ${numeroAtual} atualizada.`);
+function fazerCheckin(id) {
+    const r = buscarReserva(id);
+    if (!r || r.status !== "agendada") return erro("Só reservas agendadas podem fazer check-in.");
+    r.status = "hospedada";
+    r.checkinEm = agora();
+    return ok(`Check-in feito: ${r.hospede.nome} está no quarto ${r.quarto}.`);
+}
+
+function cancelarAgendamento(id) {
+    const r = buscarReserva(id);
+    if (!r || r.status !== "agendada") return erro("Só reservas agendadas podem ser canceladas.");
+    estado.reservas = estado.reservas.filter((x) => x !== r);
+    return ok(`Agendamento do quarto ${r.quarto} cancelado.`);
+}
+
+/** Encerra a estadia. Com consumo no frigobar, exige a confirmação do pagamento. */
+function finalizarReserva(id, pagamentoConfirmado) {
+    const r = buscarReserva(id);
+    if (!r || r.status !== "hospedada") return erro("Só reservas com hóspede no hotel podem ser encerradas.");
+    if (r.valorConsumido > 0 && !pagamentoConfirmado) return erro("Confirme o pagamento do frigobar para encerrar.");
+    r.status = "finalizada";
+    r.finalizadaEm = agora();
+    return ok(`Reserva do quarto ${r.quarto} finalizada.`);
+}
+
+/** Atualiza os dados do hóspede e, se pedido, troca de quarto (o consumo vai junto). */
+function editarReserva(id, novoQuarto, nome, email, telefone) {
+    const r = buscarReserva(id);
+    if (!r || !ativa(r)) return erro("Essa reserva não pode mais ser editada.");
+    if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
+    const trocou = novoQuarto !== r.quarto;
+    if (trocou) {
+        if (!quartoValido(novoQuarto)) return erro("Escolha um quarto válido.");
+        if (reservaDoQuarto(novoQuarto)) return erro(`O quarto ${novoQuarto} já está reservado.`);
     }
-
-    const destino = buscarQuarto(novoNumero);
-    if (!destino) return erro("Escolha um quarto válido.");
-    if (destino.ocupado) return erro(`O quarto ${novoNumero} já está ocupado.`);
-    destino.ocupado = true;
-    destino.hospede = hospede;
-    destino.valorConsumido = q.valorConsumido;
-    q.ocupado = false;
-    q.hospede = null;
-    q.valorConsumido = 0;
-    return ok(`${nome} foi para o quarto ${novoNumero}.`);
+    r.hospede = { nome, email, telefone };
+    r.quarto = novoQuarto;
+    return ok(trocou ? `${nome} foi para o quarto ${novoQuarto}.` : `Reserva do quarto ${r.quarto} atualizada.`);
 }
 
 /**
- * Lança vários produtos de uma vez em um quarto.
+ * Lança vários produtos de uma vez na reserva hospedada do quarto.
  * itens: [{ indice, quantidade }]. Valida tudo antes; se algo falhar, nada é lançado.
  */
 function registrarConsumo(numero, itens) {
-    const q = buscarQuarto(numero);
-    if (!q || !q.ocupado) return erro("Escolha um quarto com hóspede.");
+    const r = reservaDoQuarto(numero);
+    if (!r || r.status !== "hospedada") return erro("Escolha um quarto com hóspede no hotel.");
     const validos = itens.filter((i) => i.quantidade > 0);
     if (!validos.length) return erro("Adicione pelo menos um produto.");
 
@@ -120,22 +177,23 @@ function registrarConsumo(numero, itens) {
         valor += produto.preco * quantidade;
         unidades += quantidade;
     }
-    q.valorConsumido += valor;
+    r.valorConsumido += valor;
     const rotulo = unidades === 1 ? "1 item" : `${unidades} itens`;
     return ok(`${rotulo} lançados no quarto ${numero} · ${brl(valor)}.`);
 }
 
 /* ---------- Utilidades ---------- */
 
-// Ícone fixo (sem dados do usuário), por isso pode ir via innerHTML.
+// Ícones fixos (sem dados do usuário), por isso podem ir via innerHTML.
 const ICONE_OLHO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
 const ICONE_LIXEIRA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
 
-const formatoBRL =new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const formatoBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const formatoDataHora = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const brl = (v) => formatoBRL.format(v);
+const dataHora = (iso) => (iso ? formatoDataHora.format(new Date(iso)) : "—");
+const n2 = (n) => String(n).padStart(2, "0");
 const $ = (id) => document.getElementById(id);
-const ocupados = () => estado.quartos.filter((q) => q.ocupado);
-const livres = () => estado.quartos.filter((q) => !q.ocupado);
 const andar = (numero) => Math.ceil(numero / QUARTOS_POR_ANDAR);
 const parametro = (nome) => new URLSearchParams(location.search).get(nome);
 
@@ -150,6 +208,10 @@ function opcao(valor, texto) {
     const o = el("option", texto);
     o.value = String(valor);
     return o;
+}
+
+function seloStatus(status) {
+    return el("span", STATUS[status], `selo-status ${status}`);
 }
 
 function preencherSelect(select, opcoes, vazio) {
@@ -199,9 +261,12 @@ function ligar(form, acao, aoTerminar) {
 /* ---------- Página: Início ---------- */
 
 function paginaInicio() {
-    const total = estado.quartos.length;
-    const ocup = ocupados();
-    const pct = Math.round((ocup.length / total) * 100);
+    const qs = quartos();
+    const total = qs.length;
+    const reservados = qs.filter((q) => q.reserva).length;
+    const hospedadas = comStatus("hospedada").sort(porQuarto);
+    const agendadas = comStatus("agendada");
+    const pct = Math.round((reservados / total) * 100);
 
     $("data-hoje").textContent = new Intl.DateTimeFormat("pt-BR", {
         weekday: "long", day: "numeric", month: "long",
@@ -209,30 +274,34 @@ function paginaInicio() {
 
     $("anel").style.setProperty("--p", pct);
     $("anel-pct").textContent = pct + "%";
-    $("anel").setAttribute("aria-label", `Taxa de ocupação: ${pct}%`);
-    $("ocupados-texto").textContent = `${ocup.length} de ${total}`;
+    $("anel").setAttribute("aria-label", `Ocupação: ${pct}%`);
+    $("ocupacao-texto").replaceChildren(
+        el("strong", `${reservados} de ${total}`), " quartos reservados",
+        el("br"),
+        `${hospedadas.length} hospedados · ${agendadas.length} agendados`,
+    );
 
-    $("ind-livres").textContent = total - ocup.length;
-    $("ind-hospedes").textContent = ocup.length;
-    $("ind-consumo").textContent = brl(ocup.reduce((s, q) => s + q.valorConsumido, 0));
-    $("ind-estoque").textContent = estado.produtos.reduce((s, p) => s + p.quantidade, 0);
+    $("ind-livres").textContent = total - reservados;
+    $("ind-hospedes").textContent = hospedadas.length;
+    $("ind-agendados").textContent = agendadas.length;
+    $("ind-consumo").textContent = brl(hospedadas.reduce((s, r) => s + r.valorConsumido, 0));
 
     const lista = $("lista-hospedes");
     lista.replaceChildren();
-    if (!ocup.length) {
+    if (!hospedadas.length) {
         const vazio = el("div", undefined, "vazio");
-        const link = el("a", "Fazer a primeira reserva", "botao");
+        const link = el("a", agendadas.length ? "Ver reservas agendadas" : "Fazer a primeira reserva", "botao");
         link.href = "reservas.html";
-        vazio.append(el("p", "Nenhum hóspede no momento."), link);
+        vazio.append(el("p", "Nenhum hóspede no hotel agora."), link);
         lista.append(vazio);
         return;
     }
     const ul = el("ul", undefined, "lista");
-    for (const q of ocup.slice(0, 6)) {
+    for (const r of hospedadas.slice(0, 6)) {
         const li = el("li");
         const quem = el("div");
-        quem.append(el("span", q.hospede.nome, "nome"), el("span", q.hospede.email, "sub"));
-        li.append(el("span", String(q.numero).padStart(2, "0"), "num"), quem, el("span", brl(q.valorConsumido), "valor"));
+        quem.append(el("span", r.hospede.nome, "nome"), el("span", `Check-in ${dataHora(r.checkinEm)}`, "sub"));
+        li.append(el("span", n2(r.quarto), "num"), quem, el("span", brl(r.valorConsumido), "valor"));
         ul.append(li);
     }
     lista.append(ul);
@@ -245,6 +314,7 @@ function paginaQuartos() {
     const mapa = $("mapa-quartos");
     const dialogo = $("dialogo-quarto");
     const botoes = document.querySelectorAll("[data-filtro]");
+    const situacaoDoFiltro = { livres: "livre", agendados: "agendada", hospedados: "hospedada" };
 
     botoes.forEach((b) => b.addEventListener("click", () => {
         filtro = b.dataset.filtro;
@@ -255,7 +325,7 @@ function paginaQuartos() {
     dialogo.addEventListener("click", (ev) => { if (ev.target === dialogo) dialogo.close(); });
 
     function abrir(q) {
-        $("dialogo-titulo").textContent = `Quarto ${String(q.numero).padStart(2, "0")}`;
+        $("dialogo-titulo").textContent = `Quarto ${n2(q.numero)}`;
         $("dialogo-andar").textContent = `${andar(q.numero)}º andar`;
         const dl = $("dialogo-detalhes");
         const botoesDialogo = $("dialogo-botoes");
@@ -264,48 +334,54 @@ function paginaQuartos() {
 
         const linha = (rotulo, valor) => {
             const d = el("div");
-            d.append(el("dt", rotulo), el("dd", valor));
+            const dd = el("dd");
+            dd.append(valor);
+            d.append(el("dt", rotulo), dd);
             dl.append(d);
         };
+        const link = (texto, href, classe) => {
+            const a = el("a", texto, classe);
+            a.href = href;
+            return a;
+        };
 
-        if (q.ocupado) {
-            linha("Hóspede", q.hospede.nome);
-            linha("E-mail", q.hospede.email);
-            linha("Telefone", q.hospede.telefone);
-            linha("Consumo do frigobar", brl(q.valorConsumido));
-            const consumo = el("a", "Lançar consumo no frigobar", "botao");
-            consumo.href = `frigobar.html?quarto=${q.numero}`;
-            const cancelarBtn = el("button", "Encerrar reserva", "botao perigo");
-            cancelarBtn.type = "button";
-            cancelarBtn.addEventListener("click", () => {
-                const r = cancelar(q.numero);
-                avisar(r);
-                if (r.ok) salvar();
-                dialogo.close();
-                render();
-            });
-            const editarLink = el("a", "Editar reserva", "botao contorno");
-            editarLink.href = `reservas.html?quarto=${q.numero}`;
-            botoesDialogo.append(consumo, editarLink, cancelarBtn);
+        const r = q.reserva;
+        if (r) {
+            linha("Situação", seloStatus(r.status));
+            linha("Hóspede", r.hospede.nome);
+            linha("Telefone", r.hospede.telefone);
+            if (r.status === "hospedada") {
+                linha("Check-in", dataHora(r.checkinEm));
+                linha("Consumo do frigobar", brl(r.valorConsumido));
+                botoesDialogo.append(link("Lançar consumo no frigobar", `frigobar.html?quarto=${q.numero}`, "botao"));
+            }
+            botoesDialogo.append(link(
+                r.status === "agendada" ? "Ver reserva e fazer check-in" : "Ver reserva",
+                `reservas.html?quarto=${q.numero}`,
+                r.status === "agendada" ? "botao" : "botao contorno",
+            ));
         } else {
             linha("Situação", "Disponível");
             linha("Andar", `${andar(q.numero)}º`);
-            const reservarLink = el("a", "Reservar este quarto", "botao");
-            reservarLink.href = `reservas.html?quarto=${q.numero}`;
-            botoesDialogo.append(reservarLink);
+            botoesDialogo.append(link("Reservar este quarto", `reservas.html?quarto=${q.numero}`, "botao"));
         }
         dialogo.showModal();
     }
 
     function render() {
-        const n = { todos: estado.quartos.length, livres: livres().length, ocupados: ocupados().length };
+        const qs = quartos();
+        const n = {
+            todos: qs.length,
+            livres: qs.filter((q) => q.situacao === "livre").length,
+            agendados: qs.filter((q) => q.situacao === "agendada").length,
+            hospedados: qs.filter((q) => q.situacao === "hospedada").length,
+        };
         botoes.forEach((b) => {
             b.setAttribute("aria-pressed", String(b.dataset.filtro === filtro));
             b.querySelector(".contagem").textContent = n[b.dataset.filtro];
         });
 
-        const visiveis = estado.quartos.filter((q) =>
-            filtro === "todos" || (filtro === "ocupados" ? q.ocupado : !q.ocupado));
+        const visiveis = qs.filter((q) => filtro === "todos" || q.situacao === situacaoDoFiltro[filtro]);
 
         mapa.replaceChildren();
         if (!visiveis.length) {
@@ -313,12 +389,12 @@ function paginaQuartos() {
             return;
         }
 
-        const totalAndares = Math.ceil(estado.quartos.length / QUARTOS_POR_ANDAR);
+        const totalAndares = Math.ceil(qs.length / QUARTOS_POR_ANDAR);
         for (let a = totalAndares; a >= 1; a--) {
             const doAndar = visiveis.filter((q) => andar(q.numero) === a);
             if (!doAndar.length) continue;
 
-            const livresNoAndar = estado.quartos.filter((q) => andar(q.numero) === a && !q.ocupado).length;
+            const livresNoAndar = qs.filter((q) => andar(q.numero) === a && !q.reserva).length;
             const bloco = el("section", undefined, "andar");
             const rotulo = el("div", undefined, "andar-rotulo");
             rotulo.append(el("h2", `${a}º andar`), el("span", `${livresNoAndar} de ${QUARTOS_POR_ANDAR} livres`));
@@ -331,18 +407,23 @@ function paginaQuartos() {
     }
 
     function cartaoQuarto(q) {
-        const card = el("button", undefined, "quarto" + (q.ocupado ? " ocupado" : ""));
+        const r = q.reserva;
+        const card = el("button", undefined, `quarto ${q.situacao}`);
         card.type = "button";
-        card.setAttribute("aria-label", `Quarto ${q.numero}, ${q.ocupado ? "ocupado por " + q.hospede.nome : "livre"}`);
+        card.setAttribute("aria-label", r
+            ? `Quarto ${q.numero}, ${STATUS[r.status].toLowerCase()}, ${r.hospede.nome}`
+            : `Quarto ${q.numero}, livre`);
 
         const topo = el("div", undefined, "quarto-topo");
-        topo.append(el("span", String(q.numero).padStart(2, "0"), "quarto-num"), el("i", undefined, "ponto" + (q.ocupado ? " ocupado" : "")));
+        topo.append(el("span", n2(q.numero), "quarto-num"), el("i", undefined, `ponto ${q.situacao}`));
 
         const info = el("div", undefined, "quarto-info");
-        if (q.ocupado) {
-            info.append(el("span", q.hospede.nome, "nome"), el("span", "Frigobar " + brl(q.valorConsumido), "sub"));
+        if (!r) {
+            info.append(el("span", "Disponível", "nome"), el("span", "Pronto para reservar", "sub"));
+        } else if (r.status === "agendada") {
+            info.append(el("span", r.hospede.nome, "nome"), el("span", "Check-in pendente", "sub"));
         } else {
-            info.append(el("span", "Disponível", "nome"), el("span", "Pronto para check-in", "sub"));
+            info.append(el("span", r.hospede.nome, "nome"), el("span", "Frigobar " + brl(r.valorConsumido), "sub"));
         }
 
         card.append(topo, info);
@@ -361,47 +442,76 @@ function paginaReservas() {
     const lista = $("lista-reservas");
     const dialogo = $("dialogo-reserva");
     const painelEditar = $("painel-editar");
-    const painelEncerrar = $("painel-encerrar");
+    const painelConfirmar = $("painel-confirmar");
     const formEditar = $("form-editar");
     const selEditarQuarto = $("editar-quarto");
-    let emEdicao = null; // número do quarto da reserva aberta
+    const botaoPerigo = $("acao-perigo");
+    const pagamentoOk = $("pagamento-ok");
+    const botaoConfirmar = $("confirmar-acao");
+
+    let aberta = null;            // id da reserva aberta no diálogo
+    let acaoPendente = null;      // "finalizar" | "cancelar"
+    let confirmacaoVeioDaEdicao = false;
 
     const fecharDialogo = () => dialogo.close();
     $("fechar-reserva").addEventListener("click", fecharDialogo);
     dialogo.addEventListener("click", (ev) => { if (ev.target === dialogo) fecharDialogo(); });
-    dialogo.addEventListener("close", () => { emEdicao = null; });
+    dialogo.addEventListener("close", () => { aberta = null; acaoPendente = null; });
 
     function mostrarPainel(qual) {
         painelEditar.hidden = qual !== "editar";
-        painelEncerrar.hidden = qual !== "encerrar";
+        painelConfirmar.hidden = qual !== "confirmar";
     }
 
-    function abrirEdicao(q) {
-        emEdicao = q.numero;
-        const n = String(q.numero).padStart(2, "0");
-        $("reserva-sobretitulo").textContent = `Quarto ${n} · ${andar(q.numero)}º andar`;
-        formEditar.elements.nome.value = q.hospede.nome;
-        formEditar.elements.email.value = q.hospede.email;
-        formEditar.elements.telefone.value = q.hospede.telefone;
-        $("editar-consumo").textContent = brl(q.valorConsumido);
+    /* ----- Diálogo: ver / editar ----- */
+
+    function abrirReserva(r) {
+        aberta = r.id;
+        const finalizada = r.status === "finalizada";
+
+        $("reserva-sobretitulo").textContent = `Quarto ${n2(r.quarto)} · ${andar(r.quarto)}º andar`;
+        $("reserva-titulo").textContent = finalizada ? "Reserva finalizada" : "Editar reserva";
+        $("reserva-selo").replaceChildren(seloStatus(r.status));
+
+        // Faixa com a situação da reserva (e o check-in, quando agendada).
+        const faixa = $("reserva-faixa");
+        faixa.className = `faixa-status ${r.status}`;
+        $("reserva-faixa-texto").textContent = {
+            agendada: `Aguardando a chegada do hóspede. Reserva feita em ${dataHora(r.criadaEm)}.`,
+            hospedada: `Hóspede no hotel desde ${dataHora(r.checkinEm)}.`,
+            finalizada: `Finalizada em ${dataHora(r.finalizadaEm)}. Frigobar pago: ${brl(r.valorConsumido)}.`,
+        }[r.status];
+        $("fazer-checkin").hidden = r.status !== "agendada";
+
+        const campos = formEditar.elements;
+        campos.nome.value = r.hospede.nome;
+        campos.email.value = r.hospede.email;
+        campos.telefone.value = r.hospede.telefone;
+        [campos.nome, campos.email, campos.telefone, selEditarQuarto].forEach((c) => { c.disabled = finalizada; });
 
         // Quarto atual + quartos livres (para trocar de quarto).
-        selEditarQuarto.replaceChildren(opcao(q.numero, `Quarto ${n} · atual`));
-        for (const l of livres()) {
-            selEditarQuarto.append(opcao(l.numero, `Quarto ${String(l.numero).padStart(2, "0")} · ${andar(l.numero)}º andar`));
+        selEditarQuarto.replaceChildren(opcao(r.quarto, `Quarto ${n2(r.quarto)}${finalizada ? "" : " · atual"}`));
+        if (!finalizada) {
+            for (const l of livres()) selEditarQuarto.append(opcao(l.numero, `Quarto ${n2(l.numero)} · ${andar(l.numero)}º andar`));
         }
-        selEditarQuarto.value = String(q.numero);
+        selEditarQuarto.value = String(r.quarto);
+
+        $("editar-consumo-rotulo").textContent = finalizada ? "Frigobar pago" : "Consumo do frigobar";
+        $("editar-consumo").textContent = brl(r.valorConsumido);
+
+        $("acoes-edicao").hidden = finalizada;
+        $("acao-perigo-texto").textContent = r.status === "agendada" ? "Cancelar agendamento" : "Encerrar reserva";
 
         mostrarPainel("editar");
         if (!dialogo.open) dialogo.showModal();
-        formEditar.elements.nome.focus();
+        if (!finalizada) campos.nome.focus();
     }
 
     formEditar.addEventListener("submit", (ev) => {
         ev.preventDefault();
-        if (emEdicao === null) return;
+        if (aberta === null) return;
         const d = Object.fromEntries(new FormData(formEditar));
-        const r = editarReserva(emEdicao, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim());
+        const r = editarReserva(aberta, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim());
         avisar(r);
         if (!r.ok) return;
         salvar();
@@ -409,54 +519,97 @@ function paginaReservas() {
         render();
     });
 
-    // Confirmação de encerramento. Pode vir da edição ou direto da lixeira do card.
-    let encerrarVeioDaEdicao = false;
+    $("fazer-checkin").addEventListener("click", () => {
+        const id = aberta;
+        const r = fazerCheckin(id);
+        avisar(r);
+        if (!r.ok) return;
+        salvar();
+        render();
+        abrirReserva(buscarReserva(id)); // continua aberta, agora como hospedada
+    });
 
-    function pedirEncerramento(q, veioDaEdicao) {
-        emEdicao = q.numero;
-        encerrarVeioDaEdicao = veioDaEdicao;
-        $("encerrar-texto").replaceChildren(
-            "O quarto ", el("strong", String(q.numero).padStart(2, "0")),
-            " de ", el("strong", q.hospede.nome),
-            ` será liberado e o consumo do frigobar (${brl(q.valorConsumido)}) será zerado. Não dá para desfazer.`,
-        );
-        mostrarPainel("encerrar");
+    /* ----- Diálogo: confirmação (encerrar com pagamento ou cancelar agendamento) ----- */
+
+    function pedirConfirmacao(r, veioDaEdicao) {
+        aberta = r.id;
+        confirmacaoVeioDaEdicao = veioDaEdicao;
+        acaoPendente = r.status === "agendada" ? "cancelar" : "finalizar";
+        const quarto = el("strong", n2(r.quarto));
+        const nome = el("strong", r.hospede.nome);
+
+        if (acaoPendente === "cancelar") {
+            $("confirmar-titulo").textContent = "Cancelar agendamento?";
+            $("confirmar-texto").replaceChildren(
+                "A reserva de ", nome, " no quarto ", quarto,
+                " será apagada e o quarto ficará livre. Não dá para desfazer.",
+            );
+            $("confirmar-pagamento").hidden = true;
+            botaoConfirmar.textContent = "Cancelar agendamento";
+            botaoConfirmar.disabled = false;
+        } else {
+            $("confirmar-titulo").textContent = "Encerrar reserva?";
+            $("confirmar-texto").replaceChildren(
+                "A estadia de ", nome, " no quarto ", quarto,
+                " será finalizada e o quarto ficará livre.",
+            );
+            const temConsumo = r.valorConsumido > 0;
+            $("confirmar-pagamento").hidden = false;
+            $("pagamento-valor").textContent = brl(r.valorConsumido);
+            $("pagamento-rotulo").textContent = temConsumo ? "Frigobar a pagar" : "Frigobar";
+            $("pagamento-checagem").hidden = !temConsumo;
+            $("pagamento-sem-consumo").hidden = temConsumo;
+            pagamentoOk.checked = false;
+            botaoConfirmar.textContent = "Finalizar reserva";
+            botaoConfirmar.disabled = temConsumo;
+        }
+
+        mostrarPainel("confirmar");
         if (!dialogo.open) dialogo.showModal();
-        $("encerrar-voltar").focus();
+        $("confirmar-voltar").focus();
     }
 
-    $("abrir-encerrar").addEventListener("click", () => {
-        const q = buscarQuarto(emEdicao);
-        if (q && q.ocupado) pedirEncerramento(q, true);
+    pagamentoOk.addEventListener("change", () => { botaoConfirmar.disabled = !pagamentoOk.checked; });
+
+    botaoPerigo.addEventListener("click", () => {
+        const r = buscarReserva(aberta);
+        if (r && ativa(r)) pedirConfirmacao(r, true);
     });
 
-    $("encerrar-voltar").addEventListener("click", () => {
-        if (!encerrarVeioDaEdicao) return fecharDialogo();
-        mostrarPainel("editar");
-        $("abrir-encerrar").focus();
+    $("confirmar-voltar").addEventListener("click", () => {
+        if (!confirmacaoVeioDaEdicao) return fecharDialogo();
+        abrirReserva(buscarReserva(aberta));
+        botaoPerigo.focus();
     });
 
-    $("encerrar-confirmar").addEventListener("click", () => {
-        if (emEdicao === null) return;
-        const r = cancelar(emEdicao);
+    botaoConfirmar.addEventListener("click", () => {
+        if (aberta === null) return;
+        const r = acaoPendente === "cancelar"
+            ? cancelarAgendamento(aberta)
+            : finalizarReserva(aberta, pagamentoOk.checked);
         avisar(r);
-        if (r.ok) salvar();
+        if (!r.ok) return;
+        salvar();
         fecharDialogo();
         render();
     });
 
-    function cartaoReserva(q) {
-        // O card todo abre a edição com o mouse; pelo teclado, o botão do olho faz o mesmo.
-        const cartao = el("article", undefined, "reserva");
-        cartao.id = `reserva-${q.numero}`;
+    /* ----- Lista de reservas ----- */
 
-        const num = el("span", String(q.numero).padStart(2, "0"), "reserva-num");
+    function cartaoReserva(r) {
+        // O card todo abre a reserva com o mouse; pelo teclado, o botão do olho faz o mesmo.
+        const cartao = el("article", undefined, `reserva ${r.status}`);
+        cartao.id = `reserva-${r.id}`;
+
+        const num = el("span", n2(r.quarto), "reserva-num");
 
         const quem = el("span", undefined, "reserva-quem");
+        const titulo = el("span", undefined, "reserva-titulo");
+        titulo.append(el("span", r.hospede.nome, "reserva-nome"), seloStatus(r.status));
         quem.append(
-            el("span", q.hospede.nome, "reserva-nome"),
-            el("span", q.hospede.email, "reserva-contato"),
-            el("span", q.hospede.telefone, "reserva-contato"),
+            titulo,
+            el("span", r.hospede.email, "reserva-contato"),
+            el("span", r.hospede.telefone, "reserva-contato"),
         );
 
         const acoes = el("span", undefined, "reserva-acoes");
@@ -472,97 +625,137 @@ function paginaReservas() {
             });
             return b;
         };
-        acoes.append(
-            botaoIcone(ICONE_OLHO, "icone-botao", `Ver e editar a reserva do quarto ${q.numero} (${q.hospede.nome})`,
-                "Ver e editar", () => abrirEdicao(q)),
-            botaoIcone(ICONE_LIXEIRA, "icone-botao perigo", `Encerrar a reserva do quarto ${q.numero} (${q.hospede.nome})`,
-                "Encerrar reserva", () => pedirEncerramento(q, false)),
-        );
+        acoes.append(botaoIcone(ICONE_OLHO, "icone-botao", `Ver a reserva do quarto ${r.quarto} (${r.hospede.nome})`,
+            "Ver reserva", () => abrirReserva(r)));
+        if (ativa(r)) {
+            const dica = r.status === "agendada" ? "Cancelar agendamento" : "Encerrar reserva";
+            acoes.append(botaoIcone(ICONE_LIXEIRA, "icone-botao perigo", `${dica} do quarto ${r.quarto} (${r.hospede.nome})`,
+                dica, () => pedirConfirmacao(r, false)));
+        }
 
         const rodape = el("span", undefined, "reserva-rodape");
-        const frigobar = el("span", "Frigobar ");
-        frigobar.append(el("strong", brl(q.valorConsumido)));
-        rodape.append(el("span", `${andar(q.numero)}º andar`), frigobar);
+        let direita;
+        if (r.status === "agendada") {
+            direita = el("span", "Check-in pendente");
+        } else {
+            direita = el("span", r.status === "finalizada" ? "Frigobar pago " : "Frigobar ");
+            direita.append(el("strong", brl(r.valorConsumido)));
+        }
+        rodape.append(el("span", `${andar(r.quarto)}º andar`), direita);
 
         cartao.append(num, quem, acoes, rodape);
-        cartao.addEventListener("click", () => abrirEdicao(q));
+        cartao.addEventListener("click", () => abrirReserva(r));
         return cartao;
     }
 
     function render() {
         preencherSelect(selLivre,
-            livres().map((q) => [q.numero, `Quarto ${String(q.numero).padStart(2, "0")} · ${andar(q.numero)}º andar`]),
+            livres().map((q) => [q.numero, `Quarto ${n2(q.numero)} · ${andar(q.numero)}º andar`]),
             "Nenhum quarto livre");
         formReservar.querySelector("button").disabled = selLivre.disabled;
 
         renderLista();
     }
 
-    /* ----- Busca e filtros das reservas ativas ----- */
+    /* ----- Abas de status, busca e filtros ----- */
 
+    let filtroStatus = "ativas";
+    const abas = document.querySelectorAll("[data-status]");
     const busca = $("busca-reservas");
     const filtroAndar = $("filtro-andar");
     const filtroFrigobar = $("filtro-frigobar");
     const filtroOrdem = $("filtro-ordem");
     const barraFiltros = document.querySelector(".filtros-reservas");
+    const barraAbas = document.querySelector(".abas-status");
 
-    const totalAndares = Math.ceil(estado.quartos.length / QUARTOS_POR_ANDAR);
+    const totalAndares = Math.ceil(TOTAL_QUARTOS / QUARTOS_POR_ANDAR);
     for (let a = 1; a <= totalAndares; a++) filtroAndar.append(opcao(a, `${a}º andar`));
+
+    abas.forEach((b) => b.addEventListener("click", () => {
+        filtroStatus = b.dataset.status;
+        renderLista();
+    }));
 
     // Minúsculas e sem acento, para "joao" achar "João".
     const normalizar = (t) => String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     const soDigitos = (t) => String(t).replace(/\D/g, "");
 
-    function combinaBusca(q, termo) {
+    function combinaBusca(r, termo) {
         if (!termo) return true;
-        const texto = normalizar([q.hospede.nome, q.hospede.email, q.hospede.telefone].join(" "));
+        const texto = normalizar([r.hospede.nome, r.hospede.email, r.hospede.telefone].join(" "));
         if (texto.includes(normalizar(termo))) return true;
         const digitos = soDigitos(termo);
         if (!digitos) return false;
         // Número do quarto ("7" ou "07") ou trecho do telefone só com números.
-        return parseInt(digitos, 10) === q.numero || soDigitos(q.hospede.telefone).includes(digitos);
+        return parseInt(digitos, 10) === r.quarto || soDigitos(r.hospede.telefone).includes(digitos);
+    }
+
+    function doStatus(status) {
+        if (status === "ativas") return estado.reservas.filter(ativa);
+        if (status === "todas") return estado.reservas.slice();
+        return comStatus(status);
     }
 
     function renderLista() {
-        const ativos = ocupados();
-        barraFiltros.hidden = ativos.length === 0;
+        const todas = estado.reservas;
         const plural = (n) => (n === 1 ? "1 reserva" : `${n} reservas`);
 
-        if (!ativos.length) {
+        abas.forEach((b) => {
+            b.setAttribute("aria-pressed", String(b.dataset.status === filtroStatus));
+            b.querySelector(".contagem").textContent = doStatus(b.dataset.status).length;
+        });
+        barraAbas.hidden = barraFiltros.hidden = todas.length === 0;
+
+        if (!todas.length) {
             $("total-reservas").textContent = plural(0);
             const vazio = el("div", undefined, "vazio");
-            vazio.append(el("p", "Nenhuma reserva ativa. As novas reservas aparecem aqui."));
+            vazio.append(el("p", "Nenhuma reserva ainda. As novas reservas aparecem aqui como agendadas."));
             vazio.firstChild.style.margin = "0";
             lista.replaceChildren(vazio);
             return;
         }
 
+        const base = doStatus(filtroStatus);
         const termo = busca.value.trim();
         const andarEscolhido = parseInt(filtroAndar.value, 10);
         const frigobar = filtroFrigobar.value;
+        const filtrando = Boolean(termo || andarEscolhido || frigobar);
 
-        const visiveis = ativos.filter((q) =>
-            combinaBusca(q, termo)
-            && (!andarEscolhido || andar(q.numero) === andarEscolhido)
-            && (frigobar !== "com" || q.valorConsumido > 0)
-            && (frigobar !== "sem" || q.valorConsumido === 0));
+        const visiveis = base.filter((r) =>
+            combinaBusca(r, termo)
+            && (!andarEscolhido || andar(r.quarto) === andarEscolhido)
+            && (frigobar !== "com" || r.valorConsumido > 0)
+            && (frigobar !== "sem" || r.valorConsumido === 0));
 
         if (filtroOrdem.value === "nome") {
             visiveis.sort((a, b) => a.hospede.nome.localeCompare(b.hospede.nome, "pt-BR"));
         } else if (filtroOrdem.value === "consumo") {
-            visiveis.sort((a, b) => b.valorConsumido - a.valorConsumido || a.numero - b.numero);
+            visiveis.sort((a, b) => b.valorConsumido - a.valorConsumido || a.quarto - b.quarto);
+        } else {
+            visiveis.sort((a, b) => a.quarto - b.quarto || ORDEM_STATUS[a.status] - ORDEM_STATUS[b.status] || b.id - a.id);
         }
 
-        $("total-reservas").textContent = visiveis.length === ativos.length
-            ? plural(ativos.length)
-            : `${visiveis.length} de ${plural(ativos.length)}`;
+        $("total-reservas").textContent = visiveis.length === base.length
+            ? plural(base.length)
+            : `${visiveis.length} de ${plural(base.length)}`;
 
         if (!visiveis.length) {
             const vazio = el("div", undefined, "vazio");
-            const limpar = el("button", "Limpar filtros", "botao contorno");
-            limpar.type = "button";
-            limpar.addEventListener("click", limparFiltros);
-            vazio.append(el("p", "Nenhuma reserva encontrada com esses filtros."), limpar);
+            if (filtrando) {
+                const limpar = el("button", "Limpar filtros", "botao contorno");
+                limpar.type = "button";
+                limpar.addEventListener("click", limparFiltros);
+                vazio.append(el("p", "Nenhuma reserva encontrada com esses filtros."), limpar);
+            } else {
+                const texto = {
+                    ativas: "Nenhuma reserva ativa no momento.",
+                    agendada: "Nenhuma reserva agendada.",
+                    hospedada: "Nenhum hóspede no hotel agora.",
+                    finalizada: "Nenhuma reserva finalizada ainda.",
+                }[filtroStatus] || "Nenhuma reserva.";
+                vazio.append(el("p", texto));
+                vazio.firstChild.style.margin = "0";
+            }
             lista.replaceChildren(vazio);
             return;
         }
@@ -586,15 +779,15 @@ function paginaReservas() {
 
     render();
 
-    // Vindo do mapa de quartos: escolhe o quarto livre ou já abre a reserva para editar.
+    // Vindo do mapa de quartos: escolhe o quarto livre ou já abre a reserva ativa dele.
     const pedido = parametro("quarto");
     if (pedido) {
         if ([...selLivre.options].some((o) => o.value === pedido)) {
             selLivre.value = pedido;
             formReservar.querySelector("[name=nome]").focus();
         } else {
-            const q = buscarQuarto(parseInt(pedido, 10));
-            if (q && q.ocupado) abrirEdicao(q);
+            const r = reservaDoQuarto(parseInt(pedido, 10));
+            if (r) abrirReserva(r);
         }
     }
 }
@@ -713,9 +906,10 @@ function paginaFrigobar() {
         // Se o estoque mudou, tira o que esgotou.
         itens = itens.filter((it) => estado.produtos[it.indice] && estado.produtos[it.indice].quantidade > 0);
 
+        // Só quartos com hóspede no hotel (reserva hospedada) recebem consumo.
         preencherSelect(selQuarto,
-            ocupados().map((q) => [q.numero, `Quarto ${String(q.numero).padStart(2, "0")} · ${q.hospede.nome}`]),
-            "Nenhum quarto ocupado");
+            comStatus("hospedada").sort(porQuarto).map((r) => [r.quarto, `Quarto ${n2(r.quarto)} · ${r.hospede.nome}`]),
+            "Nenhum hóspede no hotel");
         semHospede = selQuarto.disabled;
         aviso.hidden = !semHospede;
 

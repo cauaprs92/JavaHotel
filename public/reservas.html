@@ -30,12 +30,12 @@
             <header class="cabecalho-pagina">
                 <span class="sobretitulo">Recepção</span>
                 <h1>Reservas</h1>
-                <p>Registre a chegada de um hóspede ou encerre uma estadia.</p>
+                <p>Agende reservas, faça o check-in quando o hóspede chegar e finalize a estadia na saída.</p>
             </header>
 
             <section class="cartao">
                 <h2>Nova reserva</h2>
-                <p class="descricao">Só aparecem os quartos livres.</p>
+                <p class="descricao">Só aparecem os quartos livres. A reserva entra como agendada até o check-in.</p>
                 <form id="form-reservar">
                     <div class="campos-reserva">
                         <div class="campo">
@@ -63,8 +63,15 @@
 
             <section class="secao">
                 <div class="secao-titulo">
-                    <h2>Reservas ativas</h2>
+                    <h2>Reservas</h2>
                     <span class="link-sutil" id="total-reservas"></span>
+                </div>
+                <div class="segmentado abas-status" role="group" aria-label="Filtrar por status">
+                    <button type="button" data-status="ativas" aria-pressed="true">Ativas<span class="contagem"></span></button>
+                    <button type="button" data-status="agendada" aria-pressed="false">Agendadas<span class="contagem"></span></button>
+                    <button type="button" data-status="hospedada" aria-pressed="false">Hospedadas<span class="contagem"></span></button>
+                    <button type="button" data-status="finalizada" aria-pressed="false">Finalizadas<span class="contagem"></span></button>
+                    <button type="button" data-status="todas" aria-pressed="false">Todas<span class="contagem"></span></button>
                 </div>
                 <div class="filtros-reservas" role="search">
                     <div class="busca">
@@ -93,14 +100,21 @@
 
     <dialog id="dialogo-reserva" aria-labelledby="reserva-titulo">
 
-        <!-- Edição -->
+        <!-- Ver / editar -->
         <div class="dialogo-corpo" id="painel-editar">
             <div class="dialogo-topo">
                 <div>
                     <span class="sobretitulo" id="reserva-sobretitulo"></span>
-                    <h2 id="reserva-titulo">Editar reserva</h2>
+                    <div class="titulo-status">
+                        <h2 id="reserva-titulo">Editar reserva</h2>
+                        <span id="reserva-selo"></span>
+                    </div>
                 </div>
                 <button type="button" class="fechar" id="fechar-reserva" aria-label="Fechar">×</button>
+            </div>
+            <div class="faixa-status" id="reserva-faixa">
+                <span id="reserva-faixa-texto"></span>
+                <button type="button" class="botao pequeno" id="fazer-checkin">Fazer check-in</button>
             </div>
             <form id="form-editar">
                 <div class="campo">
@@ -122,29 +136,40 @@
                     <select id="editar-quarto" name="numero" required></select>
                 </div>
                 <div class="resumo">
-                    <span>Consumo do frigobar</span>
+                    <span id="editar-consumo-rotulo">Consumo do frigobar</span>
                     <strong id="editar-consumo">R$ 0,00</strong>
                 </div>
-                <div class="dialogo-acoes">
-                    <button type="button" class="botao perigo" id="abrir-encerrar">
+                <div class="dialogo-acoes" id="acoes-edicao">
+                    <button type="button" class="botao perigo" id="acao-perigo">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-                        Encerrar reserva
+                        <span id="acao-perigo-texto">Encerrar reserva</span>
                     </button>
                     <button type="submit" class="botao">Salvar alterações</button>
                 </div>
             </form>
         </div>
 
-        <!-- Confirmação de encerramento -->
-        <div class="dialogo-corpo" id="painel-encerrar" hidden>
+        <!-- Confirmação: encerrar (com pagamento do frigobar) ou cancelar agendamento -->
+        <div class="dialogo-corpo" id="painel-confirmar" hidden>
             <div class="icone-perigo" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
             </div>
-            <h2 id="encerrar-titulo">Encerrar reserva?</h2>
-            <p class="dialogo-texto" id="encerrar-texto"></p>
+            <h2 id="confirmar-titulo">Encerrar reserva?</h2>
+            <p class="dialogo-texto" id="confirmar-texto"></p>
+            <div class="pagamento" id="confirmar-pagamento">
+                <div class="pagamento-linha">
+                    <span id="pagamento-rotulo">Frigobar a pagar</span>
+                    <strong id="pagamento-valor">R$ 0,00</strong>
+                </div>
+                <label class="checagem" id="pagamento-checagem">
+                    <input type="checkbox" id="pagamento-ok">
+                    <span>Confirmo que o pagamento do frigobar foi recebido.</span>
+                </label>
+                <p class="pagamento-nota" id="pagamento-sem-consumo">Sem consumo no frigobar, nada a pagar.</p>
+            </div>
             <div class="botoes-lado">
-                <button type="button" class="botao contorno" id="encerrar-voltar">Voltar</button>
-                <button type="button" class="botao perigo-cheio" id="encerrar-confirmar">Encerrar reserva</button>
+                <button type="button" class="botao contorno" id="confirmar-voltar">Voltar</button>
+                <button type="button" class="botao perigo-cheio" id="confirmar-acao">Finalizar reserva</button>
             </div>
         </div>
 

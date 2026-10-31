@@ -34,10 +34,19 @@
 
 ## ✨ O que dá pra fazer no site
 
-- ✅ Reservar um quarto (número, nome, e-mail e telefone)
-- ✅ Cancelar uma reserva
-- ✅ Registrar consumo de um produto do frigobar em um quarto ocupado
-- ✅ Ver o mapa de quartos (ocupado/livre) e o estoque do frigobar
+- ✅ Reservar um quarto (número, nome, e-mail e telefone): a reserva entra como **agendada**
+- ✅ Fazer o check-in de uma reserva agendada: ela passa para **hospedada**
+- ✅ Encerrar uma reserva hospedada confirmando o pagamento do frigobar: ela passa para **finalizada** e fica no histórico
+- ✅ Cancelar um agendamento (antes do check-in)
+- ✅ Editar os dados do hóspede ou trocar de quarto
+- ✅ Buscar e filtrar reservas por status, andar e consumo
+- ✅ Lançar vários produtos do frigobar de uma vez em um quarto com hóspede no hotel
+- ✅ Ver o mapa de quartos (livre, agendado ou hospedado) e o estoque do frigobar
+
+```
+agendada ──check-in──▶ hospedada ──encerrar (pagamento do frigobar)──▶ finalizada
+    └──cancelar agendamento──▶ (removida)
+```
 
 > Os dados ficam salvos apenas no navegador de quem usa (`localStorage`). Não há banco de dados nem compartilhamento entre usuários.
 
