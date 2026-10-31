@@ -914,6 +914,110 @@ td .quarto-mini {
     font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Frigobar: vários produtos por lançamento ---------- */
+
+.produtos {
+    border: 0;
+    margin: 0 0 8px;
+    padding: 0;
+    min-width: 0;
+}
+
+.produtos legend {
+    padding: 0;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.produto-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 10px 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    transition: border-color .15s, background .15s;
+}
+
+.produto-linha + .produto-linha { margin-top: 8px; }
+
+.produto-linha.ativo {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.produto-linha.esgotado { opacity: .5; }
+
+.produto-info { min-width: 0; }
+
+.produto-info .nome {
+    display: block;
+    font-weight: 500;
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.produto-info .sub {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.contador {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+}
+
+.contador button {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.contador button:hover:not(:disabled) { background: var(--surface-2); }
+.contador button:disabled { opacity: .3; cursor: not-allowed; }
+
+.contador input,
+.contador input:focus {
+    width: 36px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    text-align: center;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.contador input::-webkit-inner-spin-button,
+.contador input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.contador input:disabled { opacity: 1; }
+
 /* ---------- Aviso flutuante ---------- */
 
 .toast {

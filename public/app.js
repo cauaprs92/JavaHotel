@@ -70,18 +70,35 @@ function cancelar(numero) {
     return ok(`Reserva do quarto ${numero} cancelada.`);
 }
 
-function registrarConsumo(numero, indice, quantidade) {
+/**
+ * Lança vários produtos de uma vez em um quarto.
+ * itens: [{ indice, quantidade }]. Valida tudo antes; se algo falhar, nada é lançado.
+ */
+function registrarConsumo(numero, itens) {
     const q = buscarQuarto(numero);
     if (!q || !q.ocupado) return erro("Escolha um quarto com hóspede.");
-    const produto = estado.produtos[indice];
-    if (!produto) return erro("Escolha um produto válido.");
-    if (!(quantidade > 0) || quantidade > produto.quantidade) {
-        return erro(`Quantidade inválida. Em estoque: ${produto.quantidade}.`);
+    const validos = itens.filter((i) => i.quantidade > 0);
+    if (!validos.length) return erro("Adicione pelo menos um produto.");
+
+    for (const { indice, quantidade } of validos) {
+        const produto = estado.produtos[indice];
+        if (!produto) return erro("Produto inválido.");
+        if (!Number.isInteger(quantidade) || quantidade > produto.quantidade) {
+            return erro(`${produto.nomeProduto}: só há ${produto.quantidade} em estoque.`);
+        }
     }
-    produto.quantidade -= quantidade;
-    const valor = produto.preco * quantidade;
+
+    let valor = 0;
+    let unidades = 0;
+    for (const { indice, quantidade } of validos) {
+        const produto = estado.produtos[indice];
+        produto.quantidade -= quantidade;
+        valor += produto.preco * quantidade;
+        unidades += quantidade;
+    }
     q.valorConsumido += valor;
-    return ok(`Consumo de ${brl(valor)} lançado no quarto ${numero}.`);
+    const rotulo = unidades === 1 ? "1 item" : `${unidades} itens`;
+    return ok(`${rotulo} lançados no quarto ${numero} · ${brl(valor)}.`);
 }
 
 /* ---------- Utilidades ---------- */
@@ -147,7 +164,7 @@ function ligar(form, acao, aoTerminar) {
             salvar();
             form.reset();
         }
-        aoTerminar();
+        aoTerminar(resultado);
     });
 }
 
@@ -370,29 +387,85 @@ function paginaReservas() {
 function paginaFrigobar() {
     const form = $("form-consumo");
     const selQuarto = $("sel-quarto-consumo");
-    const selProduto = $("sel-produto");
-    const qtd = form.querySelector("[name=quantidade]");
+    const listaProdutos = $("lista-produtos-consumo");
+    const botaoLancar = form.querySelector("button[type=submit]");
     const aviso = $("aviso-sem-hospede");
 
+    // Quantidade escolhida de cada produto (mesma ordem de estado.produtos).
+    let qtds = estado.produtos.map(() => 0);
+    let semHospede = false;
+
     function atualizarResumo() {
-        const p = estado.produtos[parseInt(selProduto.value, 10)];
-        const n = parseInt(qtd.value, 10);
-        $("resumo-total").textContent = brl(p && n > 0 ? p.preco * n : 0);
-        if (p) qtd.max = String(p.quantidade);
+        let total = 0;
+        let unidades = 0;
+        estado.produtos.forEach((p, i) => {
+            total += p.preco * qtds[i];
+            unidades += qtds[i];
+        });
+        $("resumo-total").textContent = brl(total);
+        $("resumo-itens").textContent = unidades === 0
+            ? "Nenhum item selecionado"
+            : `${unidades} ${unidades === 1 ? "item" : "itens"} a lançar`;
+        botaoLancar.disabled = semHospede || unidades === 0;
     }
 
-    function render() {
+    function linhaProduto(p, i) {
+        const linha = el("div", undefined, "produto-linha");
+        const esgotado = p.quantidade === 0;
+        if (esgotado) linha.classList.add("esgotado");
+
+        const info = el("div", undefined, "produto-info");
+        info.append(
+            el("span", p.nomeProduto, "nome"),
+            el("span", esgotado ? `${brl(p.preco)} · esgotado` : `${brl(p.preco)} · ${p.quantidade} em estoque`, "sub"),
+        );
+
+        const contador = el("div", undefined, "contador");
+        const menos = el("button", "−");
+        const mais = el("button", "+");
+        const campo = el("input");
+        menos.type = mais.type = "button";
+        menos.setAttribute("aria-label", `Tirar um ${p.nomeProduto}`);
+        mais.setAttribute("aria-label", `Adicionar um ${p.nomeProduto}`);
+        campo.type = "number";
+        campo.min = "0";
+        campo.max = String(p.quantidade);
+        campo.inputMode = "numeric";
+        campo.setAttribute("aria-label", `Quantidade de ${p.nomeProduto}`);
+
+        function definir(n) {
+            qtds[i] = Math.max(0, Math.min(p.quantidade, Number.isFinite(n) ? Math.floor(n) : 0));
+            campo.value = String(qtds[i]);
+            menos.disabled = semHospede || qtds[i] === 0;
+            mais.disabled = semHospede || qtds[i] >= p.quantidade;
+            campo.disabled = semHospede || esgotado;
+            linha.classList.toggle("ativo", qtds[i] > 0);
+            atualizarResumo();
+        }
+
+        menos.addEventListener("click", () => definir(qtds[i] - 1));
+        mais.addEventListener("click", () => definir(qtds[i] + 1));
+        campo.addEventListener("input", () => {
+            if (campo.value !== "") definir(parseInt(campo.value, 10));
+        });
+        campo.addEventListener("blur", () => definir(parseInt(campo.value, 10)));
+
+        contador.append(menos, campo, mais);
+        linha.append(info, contador);
+        definir(qtds[i]);
+        return linha;
+    }
+
+    function render(resultado) {
+        if (resultado && resultado.ok) qtds = estado.produtos.map(() => 0);
+
         preencherSelect(selQuarto,
             ocupados().map((q) => [q.numero, `Quarto ${String(q.numero).padStart(2, "0")} · ${q.hospede.nome}`]),
             "Nenhum quarto ocupado");
-        preencherSelect(selProduto,
-            estado.produtos.map((p, i) => [i, `${p.nomeProduto} · ${brl(p.preco)}${p.quantidade ? "" : " (esgotado)"}`]),
-            "Sem produtos");
-        const semHospede = selQuarto.disabled;
+        semHospede = selQuarto.disabled;
         aviso.hidden = !semHospede;
-        qtd.disabled = semHospede;
-        selProduto.disabled = semHospede;
-        form.querySelector("button").disabled = semHospede;
+
+        listaProdutos.replaceChildren(...estado.produtos.map(linhaProduto));
         atualizarResumo();
 
         const ul = $("lista-estoque");
@@ -421,9 +494,16 @@ function paginaFrigobar() {
         $("total-itens").textContent = estado.produtos.reduce((s, p) => s + p.quantidade, 0) + " itens";
     }
 
-    selProduto.addEventListener("change", atualizarResumo);
-    qtd.addEventListener("input", atualizarResumo);
-    ligar(form, (d) => registrarConsumo(parseInt(d.numero, 10), parseInt(d.produto, 10), parseInt(d.quantidade, 10)), render);
+    // Depois de lançar, continua no mesmo quarto (o reset do formulário voltaria ao primeiro).
+    let ultimoQuarto = "";
+    form.addEventListener("submit", () => { ultimoQuarto = selQuarto.value; });
+    ligar(form, (d) => registrarConsumo(
+        parseInt(d.numero, 10),
+        qtds.map((quantidade, indice) => ({ indice, quantidade })),
+    ), (resultado) => {
+        render(resultado);
+        if ([...selQuarto.options].some((o) => o.value === ultimoQuarto)) selQuarto.value = ultimoQuarto;
+    });
 
     render();
 
