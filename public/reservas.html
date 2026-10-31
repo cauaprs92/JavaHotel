@@ -72,8 +72,52 @@
         </div>
     </main>
 
-    <dialog id="dialogo-encerrar" aria-labelledby="encerrar-titulo">
-        <div class="dialogo-corpo">
+    <dialog id="dialogo-reserva" aria-labelledby="reserva-titulo">
+
+        <!-- Edição -->
+        <div class="dialogo-corpo" id="painel-editar">
+            <div class="dialogo-topo">
+                <div>
+                    <span class="sobretitulo" id="reserva-sobretitulo"></span>
+                    <h2 id="reserva-titulo">Editar reserva</h2>
+                </div>
+                <button type="button" class="fechar" id="fechar-reserva" aria-label="Fechar">×</button>
+            </div>
+            <form id="form-editar">
+                <div class="campo">
+                    <label for="editar-nome">Nome do hóspede</label>
+                    <input id="editar-nome" type="text" name="nome" autocomplete="off" required>
+                </div>
+                <div class="campos-2">
+                    <div class="campo">
+                        <label for="editar-email">E-mail</label>
+                        <input id="editar-email" type="email" name="email" autocomplete="off" required>
+                    </div>
+                    <div class="campo">
+                        <label for="editar-telefone">Telefone</label>
+                        <input id="editar-telefone" type="tel" name="telefone" autocomplete="off" required>
+                    </div>
+                </div>
+                <div class="campo">
+                    <label for="editar-quarto">Quarto</label>
+                    <select id="editar-quarto" name="numero" required></select>
+                </div>
+                <div class="resumo">
+                    <span>Consumo do frigobar</span>
+                    <strong id="editar-consumo">R$ 0,00</strong>
+                </div>
+                <div class="dialogo-acoes">
+                    <button type="button" class="botao perigo" id="abrir-encerrar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                        Encerrar reserva
+                    </button>
+                    <button type="submit" class="botao">Salvar alterações</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Confirmação de encerramento -->
+        <div class="dialogo-corpo" id="painel-encerrar" hidden>
             <div class="icone-perigo" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
             </div>
@@ -84,6 +128,7 @@
                 <button type="button" class="botao perigo-cheio" id="encerrar-confirmar">Encerrar reserva</button>
             </div>
         </div>
+
     </dialog>
 
     <footer class="rodape">

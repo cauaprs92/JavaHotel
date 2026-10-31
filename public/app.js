@@ -70,6 +70,30 @@ function cancelar(numero) {
     return ok(`Reserva do quarto ${numero} encerrada.`);
 }
 
+/** Atualiza os dados do hóspede e, se pedido, troca de quarto levando o consumo junto. */
+function editarReserva(numeroAtual, novoNumero, nome, email, telefone) {
+    const q = buscarQuarto(numeroAtual);
+    if (!q || !q.ocupado) return erro("Essa reserva não existe mais.");
+    if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
+
+    const hospede = { nome, email, telefone };
+    if (novoNumero === numeroAtual) {
+        q.hospede = hospede;
+        return ok(`Reserva do quarto ${numeroAtual} atualizada.`);
+    }
+
+    const destino = buscarQuarto(novoNumero);
+    if (!destino) return erro("Escolha um quarto válido.");
+    if (destino.ocupado) return erro(`O quarto ${novoNumero} já está ocupado.`);
+    destino.ocupado = true;
+    destino.hospede = hospede;
+    destino.valorConsumido = q.valorConsumido;
+    q.ocupado = false;
+    q.hospede = null;
+    q.valorConsumido = 0;
+    return ok(`${nome} foi para o quarto ${novoNumero}.`);
+}
+
 /**
  * Lança vários produtos de uma vez em um quarto.
  * itens: [{ indice, quantidade }]. Valida tudo antes; se algo falhar, nada é lançado.
@@ -104,6 +128,7 @@ function registrarConsumo(numero, itens) {
 /* ---------- Utilidades ---------- */
 
 // Ícone fixo (sem dados do usuário), por isso pode ir via innerHTML.
+const ICONE_OLHO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
 const ICONE_LIXEIRA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
 
 const formatoBRL =new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -259,7 +284,9 @@ function paginaQuartos() {
                 dialogo.close();
                 render();
             });
-            botoesDialogo.append(consumo, cancelarBtn);
+            const editarLink = el("a", "Editar reserva", "botao contorno");
+            editarLink.href = `reservas.html?quarto=${q.numero}`;
+            botoesDialogo.append(consumo, editarLink, cancelarBtn);
         } else {
             linha("Situação", "Disponível");
             linha("Andar", `${andar(q.numero)}º`);
@@ -332,59 +359,133 @@ function paginaReservas() {
     const formReservar = $("form-reservar");
     const selLivre = $("sel-quarto-livre");
     const lista = $("lista-reservas");
-    const dialogo = $("dialogo-encerrar");
-    let aEncerrar = null;
+    const dialogo = $("dialogo-reserva");
+    const painelEditar = $("painel-editar");
+    const painelEncerrar = $("painel-encerrar");
+    const formEditar = $("form-editar");
+    const selEditarQuarto = $("editar-quarto");
+    let emEdicao = null; // número do quarto da reserva aberta
 
-    $("encerrar-voltar").addEventListener("click", () => dialogo.close());
-    dialogo.addEventListener("click", (ev) => { if (ev.target === dialogo) dialogo.close(); });
-    $("encerrar-confirmar").addEventListener("click", () => {
-        if (aEncerrar === null) return;
-        const r = cancelar(aEncerrar);
+    const fecharDialogo = () => dialogo.close();
+    $("fechar-reserva").addEventListener("click", fecharDialogo);
+    dialogo.addEventListener("click", (ev) => { if (ev.target === dialogo) fecharDialogo(); });
+    dialogo.addEventListener("close", () => { emEdicao = null; });
+
+    function mostrarPainel(qual) {
+        painelEditar.hidden = qual !== "editar";
+        painelEncerrar.hidden = qual !== "encerrar";
+    }
+
+    function abrirEdicao(q) {
+        emEdicao = q.numero;
+        const n = String(q.numero).padStart(2, "0");
+        $("reserva-sobretitulo").textContent = `Quarto ${n} · ${andar(q.numero)}º andar`;
+        formEditar.elements.nome.value = q.hospede.nome;
+        formEditar.elements.email.value = q.hospede.email;
+        formEditar.elements.telefone.value = q.hospede.telefone;
+        $("editar-consumo").textContent = brl(q.valorConsumido);
+
+        // Quarto atual + quartos livres (para trocar de quarto).
+        selEditarQuarto.replaceChildren(opcao(q.numero, `Quarto ${n} · atual`));
+        for (const l of livres()) {
+            selEditarQuarto.append(opcao(l.numero, `Quarto ${String(l.numero).padStart(2, "0")} · ${andar(l.numero)}º andar`));
+        }
+        selEditarQuarto.value = String(q.numero);
+
+        mostrarPainel("editar");
+        if (!dialogo.open) dialogo.showModal();
+        formEditar.elements.nome.focus();
+    }
+
+    formEditar.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        if (emEdicao === null) return;
+        const d = Object.fromEntries(new FormData(formEditar));
+        const r = editarReserva(emEdicao, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim());
         avisar(r);
-        if (r.ok) salvar();
-        aEncerrar = null;
-        dialogo.close();
+        if (!r.ok) return;
+        salvar();
+        fecharDialogo();
         render();
     });
 
-    function pedirEncerramento(q) {
-        aEncerrar = q.numero;
-        const texto = $("encerrar-texto");
-        texto.replaceChildren(
+    // Confirmação de encerramento. Pode vir da edição ou direto da lixeira do card.
+    let encerrarVeioDaEdicao = false;
+
+    function pedirEncerramento(q, veioDaEdicao) {
+        emEdicao = q.numero;
+        encerrarVeioDaEdicao = veioDaEdicao;
+        $("encerrar-texto").replaceChildren(
             "O quarto ", el("strong", String(q.numero).padStart(2, "0")),
             " de ", el("strong", q.hospede.nome),
             ` será liberado e o consumo do frigobar (${brl(q.valorConsumido)}) será zerado. Não dá para desfazer.`,
         );
-        dialogo.showModal();
+        mostrarPainel("encerrar");
+        if (!dialogo.open) dialogo.showModal();
         $("encerrar-voltar").focus();
     }
 
+    $("abrir-encerrar").addEventListener("click", () => {
+        const q = buscarQuarto(emEdicao);
+        if (q && q.ocupado) pedirEncerramento(q, true);
+    });
+
+    $("encerrar-voltar").addEventListener("click", () => {
+        if (!encerrarVeioDaEdicao) return fecharDialogo();
+        mostrarPainel("editar");
+        $("abrir-encerrar").focus();
+    });
+
+    $("encerrar-confirmar").addEventListener("click", () => {
+        if (emEdicao === null) return;
+        const r = cancelar(emEdicao);
+        avisar(r);
+        if (r.ok) salvar();
+        fecharDialogo();
+        render();
+    });
+
     function cartaoReserva(q) {
+        // O card todo abre a edição com o mouse; pelo teclado, o botão do olho faz o mesmo.
         const cartao = el("article", undefined, "reserva");
         cartao.id = `reserva-${q.numero}`;
 
         const num = el("span", String(q.numero).padStart(2, "0"), "reserva-num");
 
-        const quem = el("div", undefined, "reserva-quem");
+        const quem = el("span", undefined, "reserva-quem");
         quem.append(
             el("span", q.hospede.nome, "reserva-nome"),
             el("span", q.hospede.email, "reserva-contato"),
             el("span", q.hospede.telefone, "reserva-contato"),
         );
 
-        const lixeira = el("button", undefined, "lixeira");
-        lixeira.type = "button";
-        lixeira.title = "Encerrar reserva";
-        lixeira.setAttribute("aria-label", `Encerrar reserva do quarto ${q.numero} (${q.hospede.nome})`);
-        lixeira.innerHTML = ICONE_LIXEIRA;
-        lixeira.addEventListener("click", () => pedirEncerramento(q));
+        const acoes = el("span", undefined, "reserva-acoes");
+        const botaoIcone = (icone, classe, rotulo, dica, acao) => {
+            const b = el("button", undefined, classe);
+            b.type = "button";
+            b.title = dica;
+            b.setAttribute("aria-label", rotulo);
+            b.innerHTML = icone;
+            b.addEventListener("click", (ev) => {
+                ev.stopPropagation(); // não dispara o clique do card
+                acao();
+            });
+            return b;
+        };
+        acoes.append(
+            botaoIcone(ICONE_OLHO, "icone-botao", `Ver e editar a reserva do quarto ${q.numero} (${q.hospede.nome})`,
+                "Ver e editar", () => abrirEdicao(q)),
+            botaoIcone(ICONE_LIXEIRA, "icone-botao perigo", `Encerrar a reserva do quarto ${q.numero} (${q.hospede.nome})`,
+                "Encerrar reserva", () => pedirEncerramento(q, false)),
+        );
 
-        const rodape = el("div", undefined, "reserva-rodape");
+        const rodape = el("span", undefined, "reserva-rodape");
         const frigobar = el("span", "Frigobar ");
         frigobar.append(el("strong", brl(q.valorConsumido)));
         rodape.append(el("span", `${andar(q.numero)}º andar`), frigobar);
 
-        cartao.append(num, quem, lixeira, rodape);
+        cartao.append(num, quem, acoes, rodape);
+        cartao.addEventListener("click", () => abrirEdicao(q));
         return cartao;
     }
 
@@ -410,18 +511,15 @@ function paginaReservas() {
 
     render();
 
-    // Vindo do mapa de quartos: escolhe o quarto livre ou destaca a reserva.
+    // Vindo do mapa de quartos: escolhe o quarto livre ou já abre a reserva para editar.
     const pedido = parametro("quarto");
     if (pedido) {
         if ([...selLivre.options].some((o) => o.value === pedido)) {
             selLivre.value = pedido;
             formReservar.querySelector("[name=nome]").focus();
         } else {
-            const cartao = $(`reserva-${pedido}`);
-            if (cartao) {
-                cartao.classList.add("destaque");
-                cartao.scrollIntoView({ block: "center" });
-            }
+            const q = buscarQuarto(parseInt(pedido, 10));
+            if (q && q.ocupado) abrirEdicao(q);
         }
     }
 }
