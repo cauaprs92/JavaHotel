@@ -305,7 +305,6 @@ main {
 }
 
 .pizza-corpo {
-    flex: 1;
     display: flex;
     align-items: center;
     gap: 32px;
@@ -325,39 +324,36 @@ main {
     overflow: visible;
 }
 
-/* Fatias: borda na cor do cartão = 2px de respiro entre elas. */
+/* Anel: mesma espessura e trilho do anel de ocupação. */
+.trilho,
 .fatia {
-    stroke: var(--surface);
-    stroke-width: 2;
-    stroke-linejoin: round;
+    fill: none;
+    stroke-width: 18;
+}
+
+.trilho { stroke: var(--surface-2); }
+
+.fatia {
     cursor: pointer;
     transition: opacity .15s;
 }
 
-.fatia.agendada { fill: var(--st-agendada); }
-.fatia.hospedada { fill: var(--st-hospedada); }
-.fatia.finalizada { fill: var(--st-finalizada); }
-.fatia.vazia { fill: var(--surface-2); cursor: default; }
+.fatia.agendada { stroke: var(--st-agendada); }
+.fatia.hospedada { stroke: var(--st-hospedada); }
+.fatia.finalizada { stroke: var(--st-finalizada); }
 
 .pizza[data-ativo] .fatia:not(.ativa) { opacity: .3; }
 
-.pizza-dica {
+/* Número no centro, igual ao do anel de ocupação. */
+.pizza-centro {
     position: absolute;
-    z-index: 2;
+    inset: 0;
     display: grid;
-    gap: 2px;
-    padding: 8px 12px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    box-shadow: var(--shadow);
-    font-size: 0.82rem;
-    color: var(--muted);
-    white-space: nowrap;
+    place-content: center;
+    text-align: center;
     pointer-events: none;
+    font-variant-numeric: tabular-nums;
 }
-
-.pizza-dica strong { color: var(--ink); font-weight: 600; }
 
 .pizza-legenda {
     flex: 1;

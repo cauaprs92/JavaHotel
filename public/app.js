@@ -289,7 +289,8 @@ function paginaInicio() {
     $("ocupacao-texto").replaceChildren(
         el("strong", `${reservados} de ${total}`), " quartos reservados",
         el("br"),
-        `${hospedadas.length} hospedados · ${agendadas.length} agendados`,
+        `${hospedadas.length} ${hospedadas.length === 1 ? "hospedado" : "hospedados"} · `
+            + `${agendadas.length} ${agendadas.length === 1 ? "agendado" : "agendados"}`,
     );
 
     desenharPizza();
@@ -339,68 +340,74 @@ function porcentagens(valores) {
     return valores.map((v) => formatoPct.format(total ? v / total : 0));
 }
 
+/** Anel de reservas por status, no mesmo estilo do anel de ocupação. */
 function desenharPizza() {
     const caixa = $("pizza");
     const svg = $("pizza-svg");
     const legenda = $("pizza-legenda");
-    const dica = $("pizza-dica");
+    const centroValor = $("pizza-centro-valor");
+    const centroRotulo = $("pizza-centro-rotulo");
     const contagens = ORDEM_PIZZA.map((s) => comStatus(s).length);
     const total = contagens.reduce((s, v) => s + v, 0);
     const pcts = porcentagens(contagens);
-    const plural = (n) => (n === 1 ? "1 reserva" : `${n} reservas`);
 
-    $("pizza-total").textContent = plural(total);
     $("pizza-resumo").textContent = total
         ? "Reservas por status: " + ORDEM_PIZZA.map((s, i) => `${STATUS[s]} ${contagens[i]} (${pcts[i]})`).join(", ") + "."
         : "Nenhuma reserva ainda.";
     svg.replaceChildren();
     legenda.replaceChildren();
 
-    const C = 100;
-    const R = 96;
-    if (!total) {
-        svg.append(svgEl("circle", { cx: C, cy: C, r: R, class: "fatia vazia" }));
+    // Centro: total de reservas; com um status em destaque, a porcentagem dele.
+    function mostrarCentro(i) {
+        if (i === null) {
+            centroValor.textContent = String(total);
+            centroRotulo.textContent = total === 1 ? "reserva" : "reservas";
+        } else {
+            centroValor.textContent = pcts[i];
+            centroRotulo.textContent = STATUS[ORDEM_PIZZA[i]].toLowerCase();
+        }
     }
+    mostrarCentro(null);
 
-    // Destaque: a fatia e a linha da legenda do mesmo status acendem juntas.
+    // Mesmas medidas do anel de ocupação: 180px, espessura de 18% do raio.
+    const C = 100;
+    const ESPESSURA = 18;
+    const R = C - ESPESSURA / 2;
+    svg.append(svgEl("circle", { cx: C, cy: C, r: R, class: "trilho" }));
+
+    // Destaque: o trecho e a linha da legenda do mesmo status acendem juntos.
     function destacar(status) {
         if (status) { caixa.dataset.ativo = status; legenda.dataset.ativo = status; }
         else { delete caixa.dataset.ativo; delete legenda.dataset.ativo; }
         svg.querySelectorAll(".fatia").forEach((f) => f.classList.toggle("ativa", f.dataset.status === status));
         legenda.querySelectorAll("li").forEach((li) => li.classList.toggle("ativa", li.dataset.status === status));
+        mostrarCentro(status ? ORDEM_PIZZA.indexOf(status) : null);
     }
 
-    function mostrarDica(ev, i) {
-        const s = ORDEM_PIZZA[i];
-        dica.replaceChildren(el("strong", STATUS[s]), el("span", `${plural(contagens[i])} · ${pcts[i]}`));
-        dica.hidden = false;
-        const r = caixa.getBoundingClientRect();
-        const x = Math.min(ev.clientX - r.left + 14, r.width - dica.offsetWidth);
-        const y = Math.max(ev.clientY - r.top - dica.offsetHeight - 10, 0);
-        dica.style.left = `${Math.max(0, x)}px`;
-        dica.style.top = `${y}px`;
-    }
+    const segmentos = contagens.filter((n) => n > 0).length;
+    const respiro = segmentos > 1 ? 0.035 : 0; // pequeno vão entre os trechos (radianos)
+    const ponto = (a) => `${(C + R * Math.cos(a)).toFixed(3)} ${(C + R * Math.sin(a)).toFixed(3)}`;
 
     let angulo = -Math.PI / 2; // começa no topo, sentido horário
     ORDEM_PIZZA.forEach((status, i) => {
         const n = contagens[i];
         if (n > 0) {
             const fracao = n / total;
+            const fim = angulo + fracao * 2 * Math.PI;
             let fatia;
             if (fracao === 1) {
                 fatia = svgEl("circle", { cx: C, cy: C, r: R });
             } else {
-                const fim = angulo + fracao * 2 * Math.PI;
-                const p = (a) => `${(C + R * Math.cos(a)).toFixed(3)} ${(C + R * Math.sin(a)).toFixed(3)}`;
-                const grande = fracao > 0.5 ? 1 : 0;
-                fatia = svgEl("path", { d: `M ${C} ${C} L ${p(angulo)} A ${R} ${R} 0 ${grande} 1 ${p(fim)} Z` });
-                angulo = fim;
+                const a0 = angulo + respiro / 2;
+                const a1 = fim - respiro / 2;
+                const grande = a1 - a0 > Math.PI ? 1 : 0;
+                fatia = svgEl("path", { d: `M ${ponto(a0)} A ${R} ${R} 0 ${grande} 1 ${ponto(a1)}` });
             }
+            angulo = fim;
             fatia.setAttribute("class", `fatia ${status}`);
             fatia.dataset.status = status;
-            fatia.addEventListener("pointerenter", (ev) => { destacar(status); mostrarDica(ev, i); });
-            fatia.addEventListener("pointermove", (ev) => mostrarDica(ev, i));
-            fatia.addEventListener("pointerleave", () => { destacar(null); dica.hidden = true; });
+            fatia.addEventListener("pointerenter", () => destacar(status));
+            fatia.addEventListener("pointerleave", () => destacar(null));
             svg.append(fatia);
         }
 

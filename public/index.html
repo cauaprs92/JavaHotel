@@ -56,12 +56,14 @@
                 <div class="cartao grafico-cartao">
                     <div class="grafico-topo">
                         <h2>Reservas por status</h2>
-                        <span class="link-sutil" id="pizza-total"></span>
                     </div>
                     <div class="pizza-corpo">
                         <div class="pizza" id="pizza">
                             <svg viewBox="0 0 200 200" id="pizza-svg" role="img" aria-labelledby="pizza-resumo"></svg>
-                            <div class="pizza-dica" id="pizza-dica" role="status" hidden></div>
+                            <!-- Centro: total de reservas; ao passar o mouse, a porcentagem do status -->
+                            <div class="anel-valor pizza-centro" aria-live="polite">
+                                <span id="pizza-centro-valor">0</span><small id="pizza-centro-rotulo">reservas</small>
+                            </div>
                         </div>
                         <ul class="pizza-legenda" id="pizza-legenda" aria-label="Legenda: reservas por status"></ul>
                     </div>
