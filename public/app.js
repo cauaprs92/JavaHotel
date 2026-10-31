@@ -7,7 +7,10 @@
      agendada  → (check-in)              → hospedada
      hospedada → (encerrar + pagamento)  → finalizada
      agendada  → (cancelar agendamento)  → removida
-   Um quarto está ocupado enquanto tiver uma reserva agendada ou hospedada.
+   Cada reserva tem um período: entrada (check-in) e saída (check-out).
+   O período vale de [entrada, saída): o dia da saída de um hóspede pode ser
+   o dia de entrada do próximo. Duas reservas agendadas/hospedadas no mesmo
+   quarto nunca podem ter períodos que se sobrepõem.
    ========================================================== */
 
 const TOTAL_QUARTOS = 20;
@@ -18,6 +21,29 @@ const STORAGE_KEY = "javahotel-estado";
 
 // As chaves são as gravadas nos dados; os rótulos são o que aparece na tela.
 const STATUS = { agendada: "Agendado", hospedada: "Hospedado", finalizada: "Finalizado" };
+
+/* ---------- Datas (texto "AAAA-MM-DD", no fuso do navegador) ---------- */
+
+const doisDigitos = (n) => String(n).padStart(2, "0");
+const isoDoDia = (d) => `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}`;
+const hoje = () => isoDoDia(new Date());
+const dataValida = (iso) => typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso) && !Number.isNaN(Date.parse(iso));
+
+function somarDias(iso, dias) {
+    const [a, m, d] = iso.split("-").map(Number);
+    return isoDoDia(new Date(a, m - 1, d + dias));
+}
+
+/** Dia (AAAA-MM-DD) de um horário completo, como "criadaEm". */
+const diaDe = (instante) => (instante ? isoDoDia(new Date(instante)) : null);
+
+const noites = (entrada, saida) => Math.round((Date.parse(saida) - Date.parse(entrada)) / 864e5);
+
+/** "31/10", ou "31/10/27" quando o ano é outro. */
+function dataCurta(iso) {
+    const [a, m, d] = iso.split("-");
+    return a === hoje().slice(0, 4) ? `${d}/${m}` : `${d}/${m}/${a.slice(2)}`;
+}
 
 /* ---------- Estado ---------- */
 
@@ -52,6 +78,24 @@ function migrar(salvo) {
     return { versao: 2, proximoId: id, reservas, produtos: salvo.produtos };
 }
 
+/** Reservas criadas antes das datas ganham um período coerente com o status delas. */
+function completarDatas(r) {
+    if (dataValida(r.entrada) && dataValida(r.saida)) return;
+    const dia = hoje();
+    if (r.status === "finalizada") {
+        r.entrada = diaDe(r.checkinEm || r.criadaEm) || dia;
+        const saida = diaDe(r.finalizadaEm) || dia;
+        r.saida = saida > r.entrada ? saida : somarDias(r.entrada, 1);
+    } else if (r.status === "hospedada") {
+        r.entrada = diaDe(r.checkinEm) || dia;
+        if (r.entrada > dia) r.entrada = dia;
+        r.saida = somarDias(dia, 1);
+    } else {
+        r.entrada = dia;
+        r.saida = somarDias(dia, 1);
+    }
+}
+
 /** Código de reserva: número único e sequencial, com 4 dígitos (0001, 0002...). Nunca é reaproveitado. */
 const gerarCodigo = (id) => String(id).padStart(4, "0");
 
@@ -63,6 +107,7 @@ function carregar() {
             if (Array.isArray(atual.reservas)) {
                 // Reservas criadas antes do código de reserva recebem um a partir do id.
                 atual.reservas.forEach((r) => { if (!r.codigo) r.codigo = gerarCodigo(r.id); });
+                atual.reservas.forEach(completarDatas);
                 return atual;
             }
         }
@@ -81,20 +126,61 @@ let estado = carregar();
 const ativa = (r) => r.status !== "finalizada";
 const quartoValido = (n) => Number.isInteger(n) && n >= 1 && n <= TOTAL_QUARTOS;
 const buscarReserva = (id) => estado.reservas.find((r) => r.id === id) || null;
-const reservaDoQuarto = (numero) => estado.reservas.find((r) => r.quarto === numero && ativa(r)) || null;
 const comStatus = (status) => estado.reservas.filter((r) => r.status === status);
 const porQuarto = (a, b) => a.quarto - b.quarto;
 const porCodigo = (a, b) => parseInt(a.codigo, 10) - parseInt(b.codigo, 10);
+const porEntrada = (a, b) => a.entrada.localeCompare(b.entrada);
 
-/** Situação de cada quarto, calculada a partir das reservas ativas. */
+/** Reserva com hóspede dentro do quarto agora (no máximo uma por quarto). */
+const hospedadaDoQuarto = (numero) => estado.reservas.find((r) => r.quarto === numero && r.status === "hospedada") || null;
+
+/**
+ * Primeira reserva ativa do quarto que se sobrepõe ao período [entrada, saída).
+ * Datas em AAAA-MM-DD podem ser comparadas como texto.
+ */
+function conflito(numero, entrada, saida, ignorarId = null) {
+    return estado.reservas.find((r) =>
+        ativa(r) && r.quarto === numero && r.id !== ignorarId
+        && entrada < r.saida && r.entrada < saida) || null;
+}
+
+/** Quartos sem nenhuma reserva ativa no período. */
+function quartosDisponiveis(entrada, saida, ignorarId = null) {
+    const lista = [];
+    for (let n = 1; n <= TOTAL_QUARTOS; n++) if (!conflito(n, entrada, saida, ignorarId)) lista.push(n);
+    return lista;
+}
+
+/**
+ * Situação de cada quarto HOJE:
+ *  - hospedada: tem hóspede dentro;
+ *  - agendada:  tem reserva cujo período inclui hoje, ainda sem check-in;
+ *  - livre:     nenhuma das duas (pode ter reservas futuras em "proximas").
+ */
 function quartos() {
+    const dia = hoje();
     return Array.from({ length: TOTAL_QUARTOS }, (_, i) => {
         const numero = i + 1;
-        const reserva = reservaDoQuarto(numero);
-        return { numero, reserva, situacao: reserva ? reserva.status : "livre" };
+        const ativas = estado.reservas.filter((r) => ativa(r) && r.quarto === numero).sort(porEntrada);
+        const reserva = ativas.find((r) => r.status === "hospedada")
+            || ativas.find((r) => r.status === "agendada" && r.entrada <= dia && dia < r.saida)
+            || null;
+        const proximas = ativas.filter((r) => r !== reserva && r.status === "agendada" && r.saida > dia);
+        return { numero, reserva, proximas, situacao: reserva ? reserva.status : "livre" };
     });
 }
 const livres = () => quartos().filter((q) => !q.reserva);
+
+/** Valida um período de reserva; devolve a mensagem de erro ou null. */
+function erroDePeriodo(entrada, saida, exigirFuturo) {
+    if (!dataValida(entrada) || !dataValida(saida)) return "Informe as datas de check-in e check-out.";
+    if (saida <= entrada) return "O check-out precisa ser depois do check-in.";
+    if (exigirFuturo && entrada < hoje()) return "O check-in não pode ser em uma data que já passou.";
+    return null;
+}
+
+const descreverConflito = (c) =>
+    `O quarto ${c.quarto} já está reservado de ${dataCurta(c.entrada)} a ${dataCurta(c.saida)} (reserva #${c.codigo}).`;
 
 /* ---------- Regras ---------- */
 
@@ -102,9 +188,12 @@ const ok = (msg) => ({ ok: true, msg });
 const erro = (msg) => ({ ok: false, msg });
 const agora = () => new Date().toISOString();
 
-function reservar(numero, nome, email, telefone) {
+function reservar(numero, nome, email, telefone, entrada, saida) {
     if (!quartoValido(numero)) return erro("Escolha um quarto válido.");
-    if (reservaDoQuarto(numero)) return erro(`O quarto ${numero} já está reservado.`);
+    const problema = erroDePeriodo(entrada, saida, true);
+    if (problema) return erro(problema);
+    const c = conflito(numero, entrada, saida);
+    if (c) return erro(descreverConflito(c));
     if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
     const id = estado.proximoId++;
     const codigo = gerarCodigo(id);
@@ -114,17 +203,24 @@ function reservar(numero, nome, email, telefone) {
         quarto: numero,
         hospede: { nome, email, telefone },
         status: "agendada",
+        entrada,
+        saida,
         valorConsumido: 0,
         criadaEm: agora(),
         checkinEm: null,
         finalizadaEm: null,
     });
-    return ok(`Reserva #${codigo} criada no quarto ${numero} para ${nome} · Agendado.`);
+    return ok(`Reserva #${codigo} criada no quarto ${numero}, de ${dataCurta(entrada)} a ${dataCurta(saida)} · Agendado.`);
 }
 
 function fazerCheckin(id) {
     const r = buscarReserva(id);
     if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem fazer check-in.");
+    if (hoje() < r.entrada) return erro(`O check-in desta reserva é a partir de ${dataCurta(r.entrada)}.`);
+    const ocupante = hospedadaDoQuarto(r.quarto);
+    if (ocupante) {
+        return erro(`O quarto ${r.quarto} ainda está com ${ocupante.hospede.nome} (reserva #${ocupante.codigo}). Encerre essa estadia antes.`);
+    }
     r.status = "hospedada";
     r.checkinEm = agora();
     return ok(`Check-in da reserva #${r.codigo} feito: ${r.hospede.nome} está no quarto ${r.quarto}.`);
@@ -144,21 +240,34 @@ function finalizarReserva(id, pagamentoConfirmado) {
     if (r.valorConsumido > 0 && !pagamentoConfirmado) return erro("Confirme o pagamento do frigobar para encerrar.");
     r.status = "finalizada";
     r.finalizadaEm = agora();
+    // Saiu antes do previsto: o histórico guarda a data real de saída.
+    if (hoje() < r.saida && hoje() > r.entrada) r.saida = hoje();
     return ok(`Reserva #${r.codigo} encerrada · Finalizado.`);
 }
 
-/** Atualiza os dados do hóspede e, se pedido, troca de quarto (o consumo vai junto). */
-function editarReserva(id, novoQuarto, nome, email, telefone) {
+/**
+ * Atualiza hóspede, quarto e datas. Com hóspede no hotel, a data de entrada não muda
+ * (só dá para mudar a saída, por exemplo para estender a estadia).
+ */
+function editarReserva(id, novoQuarto, nome, email, telefone, entrada, saida) {
     const r = buscarReserva(id);
     if (!r || !ativa(r)) return erro("Essa reserva não pode mais ser editada.");
     if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
-    const trocou = novoQuarto !== r.quarto;
-    if (trocou) {
-        if (!quartoValido(novoQuarto)) return erro("Escolha um quarto válido.");
-        if (reservaDoQuarto(novoQuarto)) return erro(`O quarto ${novoQuarto} já está reservado.`);
+    if (!quartoValido(novoQuarto)) return erro("Escolha um quarto válido.");
+    if (r.status === "hospedada") entrada = r.entrada;
+    const problema = erroDePeriodo(entrada, saida, entrada !== r.entrada);
+    if (problema) return erro(problema);
+    if (r.status === "hospedada" && novoQuarto !== r.quarto && hospedadaDoQuarto(novoQuarto)) {
+        return erro(`O quarto ${novoQuarto} está com outro hóspede agora.`);
     }
+    const c = conflito(novoQuarto, entrada, saida, r.id);
+    if (c) return erro(descreverConflito(c));
+
+    const trocou = novoQuarto !== r.quarto;
     r.hospede = { nome, email, telefone };
     r.quarto = novoQuarto;
+    r.entrada = entrada;
+    r.saida = saida;
     return ok(trocou ? `Reserva #${r.codigo}: ${nome} foi para o quarto ${novoQuarto}.` : `Reserva #${r.codigo} atualizada.`);
 }
 
@@ -167,8 +276,8 @@ function editarReserva(id, novoQuarto, nome, email, telefone) {
  * itens: [{ indice, quantidade }]. Valida tudo antes; se algo falhar, nada é lançado.
  */
 function registrarConsumo(numero, itens) {
-    const r = reservaDoQuarto(numero);
-    if (!r || r.status !== "hospedada") return erro("Escolha um quarto com hóspede no hotel.");
+    const r = hospedadaDoQuarto(numero);
+    if (!r) return erro("Escolha um quarto com hóspede no hotel.");
     const validos = itens.filter((i) => i.quantidade > 0);
     if (!validos.length) return erro("Adicione pelo menos um produto.");
 
@@ -204,6 +313,13 @@ const formatoDataHora = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month
 const brl = (v) => formatoBRL.format(v);
 const dataHora = (iso) => (iso ? formatoDataHora.format(new Date(iso)) : "—");
 const n2 = (n) => String(n).padStart(2, "0");
+
+/** "3 noites · 31/10 → 03/11" */
+function textoEstadia(entrada, saida) {
+    if (!dataValida(entrada) || !dataValida(saida) || saida <= entrada) return "Datas inválidas";
+    const n = noites(entrada, saida);
+    return `${n} ${n === 1 ? "noite" : "noites"} · ${dataCurta(entrada)} → ${dataCurta(saida)}`;
+}
 const $ = (id) => document.getElementById(id);
 const andar = (numero) => Math.ceil(numero / QUARTOS_POR_ANDAR);
 const parametro = (nome) => new URLSearchParams(location.search).get(nome);
@@ -314,7 +430,7 @@ function paginaInicio() {
     for (const r of hospedadas.slice(0, 6)) {
         const li = el("li");
         const quem = el("div");
-        quem.append(el("span", r.hospede.nome, "nome"), el("span", `Reserva #${r.codigo} · check-in ${dataHora(r.checkinEm)}`, "sub"));
+        quem.append(el("span", r.hospede.nome, "nome"), el("span", `Reserva #${r.codigo} · saída ${dataCurta(r.saida)}`, "sub"));
         li.append(el("span", n2(r.quarto), "num"), quem, el("span", brl(r.valorConsumido), "valor"));
         ul.append(li);
     }
@@ -465,22 +581,34 @@ function paginaQuartos() {
             linha("Código da reserva", `#${r.codigo}`);
             linha("Situação", seloStatus(r.status));
             linha("Hóspede", r.hospede.nome);
-            linha("Telefone", r.hospede.telefone);
+            linha("Período", `${dataCurta(r.entrada)} → ${dataCurta(r.saida)}`);
             if (r.status === "hospedada") {
-                linha("Check-in", dataHora(r.checkinEm));
                 linha("Consumo do frigobar", brl(r.valorConsumido));
                 botoesDialogo.append(link("Lançar consumo no frigobar", `frigobar.html?quarto=${q.numero}`, "botao"));
             }
             botoesDialogo.append(link(
                 r.status === "agendada" ? "Ver reserva e fazer check-in" : "Ver reserva",
-                `reservas.html?quarto=${q.numero}`,
+                `reservas.html?reserva=${r.id}`,
                 r.status === "agendada" ? "botao" : "botao contorno",
             ));
         } else {
-            linha("Situação", "Disponível");
+            linha("Situação hoje", "Disponível");
             linha("Andar", `${andar(q.numero)}º`);
-            botoesDialogo.append(link("Reservar este quarto", `reservas.html?quarto=${q.numero}`, "botao"));
         }
+
+        // Próximas reservas do quarto (o quarto pode ser reservado em outras datas).
+        const lista = $("dialogo-proximas");
+        lista.replaceChildren();
+        $("dialogo-proximas-bloco").hidden = q.proximas.length === 0;
+        for (const p of q.proximas) {
+            const li = el("li");
+            const a = link("", `reservas.html?reserva=${p.id}`);
+            a.append(el("span", `#${p.codigo} · ${p.hospede.nome}`, "nome"), el("span", `${dataCurta(p.entrada)} → ${dataCurta(p.saida)}`, "sub"));
+            li.append(a);
+            lista.append(li);
+        }
+        botoesDialogo.append(link(r ? "Reservar em outras datas" : "Reservar este quarto",
+            `reservas.html?quarto=${q.numero}`, r ? "botao contorno" : "botao"));
         dialogo.showModal();
     }
 
@@ -534,12 +662,14 @@ function paginaQuartos() {
         topo.append(el("span", n2(q.numero), "quarto-num"), el("i", undefined, `ponto ${q.situacao}`));
 
         const info = el("div", undefined, "quarto-info");
+        const proxima = q.proximas[0];
         if (!r) {
-            info.append(el("span", "Disponível", "nome"), el("span", "Pronto para reservar", "sub"));
+            info.append(el("span", "Disponível", "nome"),
+                el("span", proxima ? `Próxima reserva ${dataCurta(proxima.entrada)}` : "Pronto para reservar", "sub"));
         } else if (r.status === "agendada") {
             info.append(el("span", r.hospede.nome, "nome"), el("span", "Check-in pendente", "sub"));
         } else {
-            info.append(el("span", r.hospede.nome, "nome"), el("span", "Frigobar " + brl(r.valorConsumido), "sub"));
+            info.append(el("span", r.hospede.nome, "nome"), el("span", `Saída ${dataCurta(r.saida)}`, "sub"));
         }
 
         card.append(topo, info);
@@ -592,25 +722,32 @@ function paginaReservas() {
         // Faixa com a situação da reserva (e o check-in, quando agendada).
         const faixa = $("reserva-faixa");
         faixa.className = `faixa-status ${r.status}`;
+        const antesDaEntrada = r.status === "agendada" && hoje() < r.entrada;
         $("reserva-faixa-texto").textContent = {
-            agendada: `Aguardando a chegada do hóspede. Reserva feita em ${dataHora(r.criadaEm)}.`,
-            hospedada: `Hóspede no hotel desde ${dataHora(r.checkinEm)}.`,
+            agendada: antesDaEntrada
+                ? `Check-in a partir de ${dataCurta(r.entrada)}. Reserva feita em ${dataHora(r.criadaEm)}.`
+                : `Aguardando a chegada do hóspede. Check-in previsto para ${dataCurta(r.entrada)}.`,
+            hospedada: `Hóspede no hotel desde ${dataHora(r.checkinEm)}. Saída prevista para ${dataCurta(r.saida)}.`,
             finalizada: `Finalizado em ${dataHora(r.finalizadaEm)}. Frigobar pago: ${brl(r.valorConsumido)}.`,
         }[r.status];
-        $("fazer-checkin").hidden = r.status !== "agendada";
+        const botaoCheckin = $("fazer-checkin");
+        botaoCheckin.hidden = r.status !== "agendada";
+        botaoCheckin.disabled = antesDaEntrada;
 
         const campos = formEditar.elements;
         campos.nome.value = r.hospede.nome;
         campos.email.value = r.hospede.email;
         campos.telefone.value = r.hospede.telefone;
-        [campos.nome, campos.email, campos.telefone, selEditarQuarto].forEach((c) => { c.disabled = finalizada; });
-
-        // Quarto atual + quartos livres (para trocar de quarto).
-        selEditarQuarto.replaceChildren(opcao(r.quarto, `Quarto ${n2(r.quarto)}${finalizada ? "" : " · atual"}`));
-        if (!finalizada) {
-            for (const l of livres()) selEditarQuarto.append(opcao(l.numero, `Quarto ${n2(l.numero)} · ${andar(l.numero)}º andar`));
-        }
-        selEditarQuarto.value = String(r.quarto);
+        campos.entrada.value = r.entrada;
+        campos.saida.value = r.saida;
+        [campos.nome, campos.email, campos.telefone, campos.saida, selEditarQuarto].forEach((c) => { c.disabled = finalizada; });
+        // Depois do check-in, a data de entrada fica fixa.
+        campos.entrada.disabled = r.status !== "agendada";
+        campos.entrada.min = r.entrada < hoje() ? r.entrada : hoje();
+        campos.saida.min = somarDias(r.entrada, 1);
+        selEditarQuarto.replaceChildren(); // começa do quarto desta reserva
+        atualizarQuartosEdicao(r);
+        $("editar-noites").textContent = textoEstadia(r.entrada, r.saida);
 
         $("editar-consumo-rotulo").textContent = finalizada ? "Frigobar pago" : "Consumo do frigobar";
         $("editar-consumo").textContent = brl(r.valorConsumido);
@@ -623,11 +760,41 @@ function paginaReservas() {
         if (!finalizada) campos.nome.focus();
     }
 
+    /** Quarto atual + quartos livres no período escolhido na edição. */
+    function atualizarQuartosEdicao(r) {
+        const campos = formEditar.elements;
+        const entrada = campos.entrada.value || r.entrada;
+        const saida = campos.saida.value || r.saida;
+        const atual = selEditarQuarto.value || String(r.quarto);
+        selEditarQuarto.replaceChildren(opcao(r.quarto, `Quarto ${n2(r.quarto)}${r.status === "finalizada" ? "" : " · atual"}`));
+        if (r.status !== "finalizada" && saida > entrada) {
+            for (const n of quartosDisponiveis(entrada, saida, r.id)) {
+                if (n !== r.quarto) selEditarQuarto.append(opcao(n, `Quarto ${n2(n)} · ${andar(n)}º andar`));
+            }
+        }
+        selEditarQuarto.value = [...selEditarQuarto.options].some((o) => o.value === atual) ? atual : String(r.quarto);
+    }
+
+    // Mudou a data na edição: ajusta o mínimo da saída e a lista de quartos.
+    ["entrada", "saida"].forEach((nome) => formEditar.elements[nome].addEventListener("change", () => {
+        const r = buscarReserva(aberta);
+        if (!r) return;
+        const campos = formEditar.elements;
+        if (campos.entrada.value) {
+            campos.saida.min = somarDias(campos.entrada.value, 1);
+            if (campos.saida.value <= campos.entrada.value) campos.saida.value = somarDias(campos.entrada.value, 1);
+        }
+        $("editar-noites").textContent = textoEstadia(campos.entrada.value, campos.saida.value);
+        atualizarQuartosEdicao(r);
+    }));
+
     formEditar.addEventListener("submit", (ev) => {
         ev.preventDefault();
         if (aberta === null) return;
         const d = Object.fromEntries(new FormData(formEditar));
-        const r = editarReserva(aberta, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim());
+        const atual = buscarReserva(aberta);
+        const r = editarReserva(aberta, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim(),
+            d.entrada || atual.entrada, d.saida);
         avisar(r);
         if (!r.ok) return;
         salvar();
@@ -761,7 +928,7 @@ function paginaReservas() {
             direita.append(el("strong", brl(r.valorConsumido)));
         }
         const local = el("span", "Quarto ");
-        local.append(el("strong", n2(r.quarto)), ` · ${andar(r.quarto)}º andar`);
+        local.append(el("strong", n2(r.quarto)), ` · ${dataCurta(r.entrada)} → ${dataCurta(r.saida)}`);
         rodape.append(local, direita);
 
         cartao.append(num, quem, acoes, rodape);
@@ -769,12 +936,56 @@ function paginaReservas() {
         return cartao;
     }
 
-    function render() {
-        preencherSelect(selLivre,
-            livres().map((q) => [q.numero, `Quarto ${n2(q.numero)} · ${andar(q.numero)}º andar`]),
-            "Nenhum quarto livre");
-        formReservar.querySelector("button").disabled = selLivre.disabled;
+    /* ----- Nova reserva: as datas definem quais quartos aparecem ----- */
 
+    const novaEntrada = formReservar.elements.entrada;
+    const novaSaida = formReservar.elements.saida;
+    let quartoPreferido = null; // vindo do mapa de quartos (?quarto=N)
+
+    function datasPadrao() {
+        novaEntrada.value = hoje();
+        novaSaida.value = somarDias(hoje(), 1);
+    }
+
+    function atualizarNovaReserva() {
+        novaEntrada.min = hoje();
+        if (dataValida(novaEntrada.value)) {
+            novaSaida.min = somarDias(novaEntrada.value, 1);
+            if (!dataValida(novaSaida.value) || novaSaida.value <= novaEntrada.value) {
+                novaSaida.value = somarDias(novaEntrada.value, 1);
+            }
+        }
+        const entrada = novaEntrada.value;
+        const saida = novaSaida.value;
+        const periodoOk = !erroDePeriodo(entrada, saida, true);
+        const disponiveis = periodoOk ? quartosDisponiveis(entrada, saida) : [];
+
+        preencherSelect(selLivre,
+            disponiveis.map((n) => [n, `Quarto ${n2(n)} · ${andar(n)}º andar`]),
+            periodoOk ? "Nenhum quarto livre nessas datas" : "Escolha datas válidas");
+        if (quartoPreferido && disponiveis.includes(quartoPreferido)) selLivre.value = String(quartoPreferido);
+        formReservar.querySelector("button[type=submit]").disabled = selLivre.disabled;
+
+        $("nova-estadia").textContent = periodoOk
+            ? `${textoEstadia(entrada, saida)} · ${disponiveis.length} ${disponiveis.length === 1 ? "quarto livre" : "quartos livres"}`
+            : erroDePeriodo(entrada, saida, true);
+    }
+
+    [novaEntrada, novaSaida].forEach((c) => c.addEventListener("change", atualizarNovaReserva));
+
+    /** Primeiro dia (a partir de hoje) em que o quarto está livre por pelo menos uma noite. */
+    function primeiroDiaLivre(numero) {
+        let dia = hoje();
+        for (let i = 0; i < 730; i++, dia = somarDias(dia, 1)) {
+            if (!conflito(numero, dia, somarDias(dia, 1))) return dia;
+        }
+        return hoje();
+    }
+
+    function render(resultado) {
+        if (resultado && resultado.ok) quartoPreferido = null;
+        if (!dataValida(novaEntrada.value)) datasPadrao(); // o reset do formulário limpa as datas
+        atualizarNovaReserva();
         renderLista();
     }
 
@@ -902,20 +1113,27 @@ function paginaReservas() {
     busca.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && busca.value) { busca.value = ""; renderLista(); } });
     [filtroAndar, filtroFrigobar, filtroOrdem].forEach((s) => s.addEventListener("change", renderLista));
 
-    ligar(formReservar, (d) => reservar(parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim()), render);
+    ligar(formReservar, (d) => reservar(parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim(),
+        d.entrada, d.saida), render);
 
+    datasPadrao();
     render();
 
-    // Vindo do mapa de quartos: escolhe o quarto livre ou já abre a reserva ativa dele.
-    const pedido = parametro("quarto");
-    if (pedido) {
-        if ([...selLivre.options].some((o) => o.value === pedido)) {
-            selLivre.value = pedido;
-            formReservar.querySelector("[name=nome]").focus();
-        } else {
-            const r = reservaDoQuarto(parseInt(pedido, 10));
-            if (r) abrirReserva(r);
-        }
+    // Vindo do mapa de quartos:
+    //  ?reserva=ID abre a reserva;  ?quarto=N prepara uma nova reserva nesse quarto,
+    //  já na primeira data em que ele está livre.
+    const pedidoReserva = buscarReserva(parseInt(parametro("reserva"), 10));
+    const pedidoQuarto = parseInt(parametro("quarto"), 10);
+    if (pedidoReserva) {
+        if (!ativa(pedidoReserva)) document.querySelector('[data-status="todas"]').click();
+        abrirReserva(pedidoReserva);
+    } else if (quartoValido(pedidoQuarto)) {
+        quartoPreferido = pedidoQuarto;
+        const dia = primeiroDiaLivre(pedidoQuarto);
+        novaEntrada.value = dia;
+        novaSaida.value = somarDias(dia, 1);
+        atualizarNovaReserva();
+        formReservar.elements.nome.focus();
     }
 }
 

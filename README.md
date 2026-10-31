@@ -34,7 +34,8 @@
 
 ## ✨ O que dá pra fazer no site
 
-- ✅ Reservar um quarto (número, nome, e-mail e telefone): a reserva ganha um **código de reserva** único (#0001, #0002…) e começa com o status **Agendado**
+- ✅ Reservar um quarto com **data de check-in e check-out**: a reserva ganha um **código de reserva** único (#0001, #0002…) e começa com o status **Agendado**
+- ✅ Reservar um quarto que já está ocupado, para datas futuras: só aparecem os quartos livres no período escolhido, e o sistema não aceita períodos que se sobrepõem (o dia da saída de um hóspede pode ser o dia da entrada do próximo)
 - ✅ Fazer o check-in: o status passa para **Hospedado**
 - ✅ Encerrar a reserva confirmando o pagamento do frigobar: o status passa para **Finalizado** e ela fica no histórico
 - ✅ Cancelar um agendamento (antes do check-in)
