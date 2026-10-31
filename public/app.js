@@ -16,7 +16,8 @@ const ESTOQUE_REFERENCIA = 20;
 const ESTOQUE_BAIXO = 5;
 const STORAGE_KEY = "javahotel-estado";
 
-const STATUS = { agendada: "Agendada", hospedada: "Hospedada", finalizada: "Finalizada" };
+// As chaves são as gravadas nos dados; os rótulos são o que aparece na tela.
+const STATUS = { agendada: "Agendado", hospedada: "Hospedado", finalizada: "Finalizado" };
 const ORDEM_STATUS = { agendada: 0, hospedada: 1, finalizada: 2 };
 
 /* ---------- Estado ---------- */
@@ -108,12 +109,12 @@ function reservar(numero, nome, email, telefone) {
         checkinEm: null,
         finalizadaEm: null,
     });
-    return ok(`Reserva agendada no quarto ${numero} para ${nome}.`);
+    return ok(`Reserva criada no quarto ${numero} para ${nome} · Agendado.`);
 }
 
 function fazerCheckin(id) {
     const r = buscarReserva(id);
-    if (!r || r.status !== "agendada") return erro("Só reservas agendadas podem fazer check-in.");
+    if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem fazer check-in.");
     r.status = "hospedada";
     r.checkinEm = agora();
     return ok(`Check-in feito: ${r.hospede.nome} está no quarto ${r.quarto}.`);
@@ -121,7 +122,7 @@ function fazerCheckin(id) {
 
 function cancelarAgendamento(id) {
     const r = buscarReserva(id);
-    if (!r || r.status !== "agendada") return erro("Só reservas agendadas podem ser canceladas.");
+    if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem ser canceladas.");
     estado.reservas = estado.reservas.filter((x) => x !== r);
     return ok(`Agendamento do quarto ${r.quarto} cancelado.`);
 }
@@ -133,7 +134,7 @@ function finalizarReserva(id, pagamentoConfirmado) {
     if (r.valorConsumido > 0 && !pagamentoConfirmado) return erro("Confirme o pagamento do frigobar para encerrar.");
     r.status = "finalizada";
     r.finalizadaEm = agora();
-    return ok(`Reserva do quarto ${r.quarto} finalizada.`);
+    return ok(`Reserva do quarto ${r.quarto} encerrada · Finalizado.`);
 }
 
 /** Atualiza os dados do hóspede e, se pedido, troca de quarto (o consumo vai junto). */
@@ -290,7 +291,7 @@ function paginaInicio() {
     lista.replaceChildren();
     if (!hospedadas.length) {
         const vazio = el("div", undefined, "vazio");
-        const link = el("a", agendadas.length ? "Ver reservas agendadas" : "Fazer a primeira reserva", "botao");
+        const link = el("a", agendadas.length ? "Ver agendamentos" : "Fazer a primeira reserva", "botao");
         link.href = "reservas.html";
         vazio.append(el("p", "Nenhum hóspede no hotel agora."), link);
         lista.append(vazio);
@@ -470,7 +471,7 @@ function paginaReservas() {
         const finalizada = r.status === "finalizada";
 
         $("reserva-sobretitulo").textContent = `Quarto ${n2(r.quarto)} · ${andar(r.quarto)}º andar`;
-        $("reserva-titulo").textContent = finalizada ? "Reserva finalizada" : "Editar reserva";
+        $("reserva-titulo").textContent = finalizada ? "Detalhes da reserva" : "Editar reserva";
         $("reserva-selo").replaceChildren(seloStatus(r.status));
 
         // Faixa com a situação da reserva (e o check-in, quando agendada).
@@ -479,7 +480,7 @@ function paginaReservas() {
         $("reserva-faixa-texto").textContent = {
             agendada: `Aguardando a chegada do hóspede. Reserva feita em ${dataHora(r.criadaEm)}.`,
             hospedada: `Hóspede no hotel desde ${dataHora(r.checkinEm)}.`,
-            finalizada: `Finalizada em ${dataHora(r.finalizadaEm)}. Frigobar pago: ${brl(r.valorConsumido)}.`,
+            finalizada: `Finalizado em ${dataHora(r.finalizadaEm)}. Frigobar pago: ${brl(r.valorConsumido)}.`,
         }[r.status];
         $("fazer-checkin").hidden = r.status !== "agendada";
 
@@ -551,7 +552,7 @@ function paginaReservas() {
             $("confirmar-titulo").textContent = "Encerrar reserva?";
             $("confirmar-texto").replaceChildren(
                 "A estadia de ", nome, " no quarto ", quarto,
-                " será finalizada e o quarto ficará livre.",
+                " será encerrada com o status Finalizado e o quarto ficará livre.",
             );
             const temConsumo = r.valorConsumido > 0;
             $("confirmar-pagamento").hidden = false;
@@ -709,7 +710,7 @@ function paginaReservas() {
         if (!todas.length) {
             $("total-reservas").textContent = plural(0);
             const vazio = el("div", undefined, "vazio");
-            vazio.append(el("p", "Nenhuma reserva ainda. As novas reservas aparecem aqui como agendadas."));
+            vazio.append(el("p", "Nenhuma reserva ainda. As novas reservas aparecem aqui com o status Agendado."));
             vazio.firstChild.style.margin = "0";
             lista.replaceChildren(vazio);
             return;
@@ -748,10 +749,10 @@ function paginaReservas() {
                 vazio.append(el("p", "Nenhuma reserva encontrada com esses filtros."), limpar);
             } else {
                 const texto = {
-                    ativas: "Nenhuma reserva ativa no momento.",
-                    agendada: "Nenhuma reserva agendada.",
+                    ativas: "Nenhuma reserva em andamento no momento.",
+                    agendada: "Nenhuma reserva com status Agendado.",
                     hospedada: "Nenhum hóspede no hotel agora.",
-                    finalizada: "Nenhuma reserva finalizada ainda.",
+                    finalizada: "Nenhuma reserva com status Finalizado ainda.",
                 }[filtroStatus] || "Nenhuma reserva.";
                 vazio.append(el("p", texto));
                 vazio.firstChild.style.margin = "0";

@@ -34,9 +34,9 @@
 
 ## ✨ O que dá pra fazer no site
 
-- ✅ Reservar um quarto (número, nome, e-mail e telefone): a reserva entra como **agendada**
-- ✅ Fazer o check-in de uma reserva agendada: ela passa para **hospedada**
-- ✅ Encerrar uma reserva hospedada confirmando o pagamento do frigobar: ela passa para **finalizada** e fica no histórico
+- ✅ Reservar um quarto (número, nome, e-mail e telefone): a reserva começa com o status **Agendado**
+- ✅ Fazer o check-in: o status passa para **Hospedado**
+- ✅ Encerrar a reserva confirmando o pagamento do frigobar: o status passa para **Finalizado** e ela fica no histórico
 - ✅ Cancelar um agendamento (antes do check-in)
 - ✅ Editar os dados do hóspede ou trocar de quarto
 - ✅ Buscar e filtrar reservas por status, andar e consumo
@@ -44,7 +44,7 @@
 - ✅ Ver o mapa de quartos (livre, agendado ou hospedado) e o estoque do frigobar
 
 ```
-agendada ──check-in──▶ hospedada ──encerrar (pagamento do frigobar)──▶ finalizada
+Agendado ──check-in──▶ Hospedado ──encerrar (pagamento do frigobar)──▶ Finalizado
     └──cancelar agendamento──▶ (removida)
 ```
 
