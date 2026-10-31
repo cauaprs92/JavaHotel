@@ -495,17 +495,92 @@ function paginaReservas() {
             "Nenhum quarto livre");
         formReservar.querySelector("button").disabled = selLivre.disabled;
 
+        renderLista();
+    }
+
+    /* ----- Busca e filtros das reservas ativas ----- */
+
+    const busca = $("busca-reservas");
+    const filtroAndar = $("filtro-andar");
+    const filtroFrigobar = $("filtro-frigobar");
+    const filtroOrdem = $("filtro-ordem");
+    const barraFiltros = document.querySelector(".filtros-reservas");
+
+    const totalAndares = Math.ceil(estado.quartos.length / QUARTOS_POR_ANDAR);
+    for (let a = 1; a <= totalAndares; a++) filtroAndar.append(opcao(a, `${a}º andar`));
+
+    // Minúsculas e sem acento, para "joao" achar "João".
+    const normalizar = (t) => String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const soDigitos = (t) => String(t).replace(/\D/g, "");
+
+    function combinaBusca(q, termo) {
+        if (!termo) return true;
+        const texto = normalizar([q.hospede.nome, q.hospede.email, q.hospede.telefone].join(" "));
+        if (texto.includes(normalizar(termo))) return true;
+        const digitos = soDigitos(termo);
+        if (!digitos) return false;
+        // Número do quarto ("7" ou "07") ou trecho do telefone só com números.
+        return parseInt(digitos, 10) === q.numero || soDigitos(q.hospede.telefone).includes(digitos);
+    }
+
+    function renderLista() {
         const ativos = ocupados();
-        $("total-reservas").textContent = ativos.length === 1 ? "1 reserva" : `${ativos.length} reservas`;
+        barraFiltros.hidden = ativos.length === 0;
+        const plural = (n) => (n === 1 ? "1 reserva" : `${n} reservas`);
+
         if (!ativos.length) {
+            $("total-reservas").textContent = plural(0);
             const vazio = el("div", undefined, "vazio");
             vazio.append(el("p", "Nenhuma reserva ativa. As novas reservas aparecem aqui."));
             vazio.firstChild.style.margin = "0";
             lista.replaceChildren(vazio);
             return;
         }
-        lista.replaceChildren(...ativos.map(cartaoReserva));
+
+        const termo = busca.value.trim();
+        const andarEscolhido = parseInt(filtroAndar.value, 10);
+        const frigobar = filtroFrigobar.value;
+
+        const visiveis = ativos.filter((q) =>
+            combinaBusca(q, termo)
+            && (!andarEscolhido || andar(q.numero) === andarEscolhido)
+            && (frigobar !== "com" || q.valorConsumido > 0)
+            && (frigobar !== "sem" || q.valorConsumido === 0));
+
+        if (filtroOrdem.value === "nome") {
+            visiveis.sort((a, b) => a.hospede.nome.localeCompare(b.hospede.nome, "pt-BR"));
+        } else if (filtroOrdem.value === "consumo") {
+            visiveis.sort((a, b) => b.valorConsumido - a.valorConsumido || a.numero - b.numero);
+        }
+
+        $("total-reservas").textContent = visiveis.length === ativos.length
+            ? plural(ativos.length)
+            : `${visiveis.length} de ${plural(ativos.length)}`;
+
+        if (!visiveis.length) {
+            const vazio = el("div", undefined, "vazio");
+            const limpar = el("button", "Limpar filtros", "botao contorno");
+            limpar.type = "button";
+            limpar.addEventListener("click", limparFiltros);
+            vazio.append(el("p", "Nenhuma reserva encontrada com esses filtros."), limpar);
+            lista.replaceChildren(vazio);
+            return;
+        }
+        lista.replaceChildren(...visiveis.map(cartaoReserva));
     }
+
+    function limparFiltros() {
+        busca.value = "";
+        filtroAndar.value = "";
+        filtroFrigobar.value = "";
+        filtroOrdem.value = "quarto";
+        renderLista();
+        busca.focus();
+    }
+
+    busca.addEventListener("input", renderLista);
+    busca.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && busca.value) { busca.value = ""; renderLista(); } });
+    [filtroAndar, filtroFrigobar, filtroOrdem].forEach((s) => s.addEventListener("change", renderLista));
 
     ligar(formReservar, (d) => reservar(parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim()), render);
 
