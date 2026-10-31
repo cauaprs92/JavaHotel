@@ -36,7 +36,7 @@
             <div class="grade-2">
                 <section class="cartao">
                     <h2>Lançar consumo</h2>
-                    <p class="descricao">Escolha o quarto e quantos itens de cada produto ele consumiu.</p>
+                    <p class="descricao">Escolha o quarto e adicione os produtos consumidos.</p>
                     <p class="aviso" id="aviso-sem-hospede" hidden>
                         Nenhum quarto está ocupado. <a href="reservas.html">Faça uma reserva</a> para lançar consumo.
                     </p>
@@ -47,7 +47,10 @@
                         </div>
                         <fieldset class="produtos">
                             <legend>Produtos</legend>
-                            <div id="lista-produtos-consumo"></div>
+                            <div id="lista-produtos-consumo" class="lista-produtos"></div>
+                            <div class="adicionar-produto">
+                                <select id="sel-adicionar" aria-label="Adicionar produto"></select>
+                            </div>
                         </fieldset>
                         <div class="resumo">
                             <span id="resumo-itens">Nenhum item selecionado</span>

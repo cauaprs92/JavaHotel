@@ -391,34 +391,49 @@ function paginaFrigobar() {
     const botaoLancar = form.querySelector("button[type=submit]");
     const aviso = $("aviso-sem-hospede");
 
-    // Quantidade escolhida de cada produto (mesma ordem de estado.produtos).
-    let qtds = estado.produtos.map(() => 0);
+    const selAdicionar = $("sel-adicionar");
+
+    // Produtos adicionados a este lançamento, na ordem em que foram escolhidos.
+    let itens = [];
     let semHospede = false;
 
     function atualizarResumo() {
         let total = 0;
         let unidades = 0;
-        estado.produtos.forEach((p, i) => {
-            total += p.preco * qtds[i];
-            unidades += qtds[i];
-        });
+        for (const { indice, quantidade } of itens) {
+            total += estado.produtos[indice].preco * quantidade;
+            unidades += quantidade;
+        }
         $("resumo-total").textContent = brl(total);
         $("resumo-itens").textContent = unidades === 0
-            ? "Nenhum item selecionado"
+            ? "Nenhum produto adicionado"
             : `${unidades} ${unidades === 1 ? "item" : "itens"} a lançar`;
         botaoLancar.disabled = semHospede || unidades === 0;
     }
 
-    function linhaProduto(p, i) {
-        const linha = el("div", undefined, "produto-linha");
-        const esgotado = p.quantidade === 0;
-        if (esgotado) linha.classList.add("esgotado");
+    /** Monta a caixa "Adicionar produto" só com o que ainda não foi adicionado e tem estoque. */
+    function atualizarSeletor() {
+        const disponiveis = estado.produtos
+            .map((p, i) => [p, i])
+            .filter(([p, i]) => p.quantidade > 0 && !itens.some((it) => it.indice === i));
+
+        selAdicionar.replaceChildren(opcao("", itens.length ? "+ Adicionar outro produto" : "+ Adicionar produto"));
+        for (const [p, i] of disponiveis) {
+            selAdicionar.append(opcao(i, `${p.nomeProduto} · ${brl(p.preco)}`));
+        }
+        selAdicionar.value = "";
+        selAdicionar.disabled = semHospede;
+        selAdicionar.parentElement.hidden = disponiveis.length === 0;
+    }
+
+    function cartaoProduto(item) {
+        const p = estado.produtos[item.indice];
+        const cartao = el("div", undefined, "produto-linha ativo");
 
         const info = el("div", undefined, "produto-info");
-        info.append(
-            el("span", p.nomeProduto, "nome"),
-            el("span", esgotado ? `${brl(p.preco)} · esgotado` : `${brl(p.preco)} · ${p.quantidade} em estoque`, "sub"),
-        );
+        info.append(el("span", p.nomeProduto, "nome"));
+        const sub = el("span", undefined, "sub");
+        info.append(sub);
 
         const contador = el("div", undefined, "contador");
         const menos = el("button", "−");
@@ -428,36 +443,58 @@ function paginaFrigobar() {
         menos.setAttribute("aria-label", `Tirar um ${p.nomeProduto}`);
         mais.setAttribute("aria-label", `Adicionar um ${p.nomeProduto}`);
         campo.type = "number";
-        campo.min = "0";
+        campo.min = "1";
         campo.max = String(p.quantidade);
         campo.inputMode = "numeric";
         campo.setAttribute("aria-label", `Quantidade de ${p.nomeProduto}`);
 
+        const remover = el("button", "×", "remover");
+        remover.type = "button";
+        remover.setAttribute("aria-label", `Remover ${p.nomeProduto}`);
+        remover.addEventListener("click", () => {
+            itens = itens.filter((it) => it !== item);
+            cartao.remove();
+            atualizarSeletor();
+            atualizarResumo();
+            selAdicionar.focus();
+        });
+
         function definir(n) {
-            qtds[i] = Math.max(0, Math.min(p.quantidade, Number.isFinite(n) ? Math.floor(n) : 0));
-            campo.value = String(qtds[i]);
-            menos.disabled = semHospede || qtds[i] === 0;
-            mais.disabled = semHospede || qtds[i] >= p.quantidade;
-            campo.disabled = semHospede || esgotado;
-            linha.classList.toggle("ativo", qtds[i] > 0);
+            item.quantidade = Math.max(1, Math.min(p.quantidade, Number.isFinite(n) ? Math.floor(n) : 1));
+            campo.value = String(item.quantidade);
+            sub.textContent = `${brl(p.preco)} · ${p.quantidade} em estoque · subtotal ${brl(p.preco * item.quantidade)}`;
+            menos.disabled = semHospede || item.quantidade <= 1;
+            mais.disabled = semHospede || item.quantidade >= p.quantidade;
+            campo.disabled = remover.disabled = semHospede;
             atualizarResumo();
         }
 
-        menos.addEventListener("click", () => definir(qtds[i] - 1));
-        mais.addEventListener("click", () => definir(qtds[i] + 1));
+        menos.addEventListener("click", () => definir(item.quantidade - 1));
+        mais.addEventListener("click", () => definir(item.quantidade + 1));
         campo.addEventListener("input", () => {
             if (campo.value !== "") definir(parseInt(campo.value, 10));
         });
         campo.addEventListener("blur", () => definir(parseInt(campo.value, 10)));
 
         contador.append(menos, campo, mais);
-        linha.append(info, contador);
-        definir(qtds[i]);
-        return linha;
+        cartao.append(info, contador, remover);
+        definir(item.quantidade);
+        return cartao;
     }
 
+    selAdicionar.addEventListener("change", () => {
+        if (selAdicionar.value === "") return;
+        const item = { indice: parseInt(selAdicionar.value, 10), quantidade: 1 };
+        itens.push(item);
+        listaProdutos.append(cartaoProduto(item));
+        atualizarSeletor();
+        atualizarResumo();
+    });
+
     function render(resultado) {
-        if (resultado && resultado.ok) qtds = estado.produtos.map(() => 0);
+        if (resultado && resultado.ok) itens = [];
+        // Se o estoque mudou, tira o que esgotou.
+        itens = itens.filter((it) => estado.produtos[it.indice] && estado.produtos[it.indice].quantidade > 0);
 
         preencherSelect(selQuarto,
             ocupados().map((q) => [q.numero, `Quarto ${String(q.numero).padStart(2, "0")} · ${q.hospede.nome}`]),
@@ -465,7 +502,8 @@ function paginaFrigobar() {
         semHospede = selQuarto.disabled;
         aviso.hidden = !semHospede;
 
-        listaProdutos.replaceChildren(...estado.produtos.map(linhaProduto));
+        listaProdutos.replaceChildren(...itens.map(cartaoProduto));
+        atualizarSeletor();
         atualizarResumo();
 
         const ul = $("lista-estoque");
@@ -497,10 +535,7 @@ function paginaFrigobar() {
     // Depois de lançar, continua no mesmo quarto (o reset do formulário voltaria ao primeiro).
     let ultimoQuarto = "";
     form.addEventListener("submit", () => { ultimoQuarto = selQuarto.value; });
-    ligar(form, (d) => registrarConsumo(
-        parseInt(d.numero, 10),
-        qtds.map((quantidade, indice) => ({ indice, quantidade })),
-    ), (resultado) => {
+    ligar(form, (d) => registrarConsumo(parseInt(d.numero, 10), itens), (resultado) => {
         render(resultado);
         if ([...selQuarto.options].some((o) => o.value === ultimoQuarto)) selQuarto.value = ultimoQuarto;
     });

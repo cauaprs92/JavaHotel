@@ -1018,6 +1018,47 @@ td .quarto-mini {
 
 .contador input:disabled { opacity: 1; }
 
+.lista-produtos:not(:empty) { margin-bottom: 8px; }
+
+.produto-linha .remover {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    margin-left: -8px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.produto-linha .remover:hover:not(:disabled) {
+    background: var(--busy-bg);
+    color: var(--busy);
+}
+
+.produto-linha .remover:disabled { opacity: .3; cursor: not-allowed; }
+
+.produto-info { flex: 1; }
+
+.adicionar-produto select {
+    border-style: dashed;
+    background-color: transparent;
+    color: var(--muted);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.adicionar-produto select:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--ink);
+}
+
+.adicionar-produto select option { color: var(--ink); background: var(--surface); }
+
 /* ---------- Aviso flutuante ---------- */
 
 .toast {
