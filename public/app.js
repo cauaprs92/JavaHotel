@@ -634,7 +634,7 @@ function paginaQuartos() {
         }
 
         const totalAndares = Math.ceil(qs.length / QUARTOS_POR_ANDAR);
-        for (let a = totalAndares; a >= 1; a--) {
+        for (let a = 1; a <= totalAndares; a++) { // 1º andar em cima
             const doAndar = visiveis.filter((q) => andar(q.numero) === a);
             if (!doAndar.length) continue;
 
