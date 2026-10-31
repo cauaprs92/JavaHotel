@@ -48,9 +48,12 @@
 ```
 JavaHotel/
 ├── public/                   # Site publicado na Vercel (estático)
-│   ├── index.html            # Página do painel
-│   ├── app.js                # Regras de reservas e frigobar
-│   └── css/style.css         # Estilo da página
+│   ├── index.html            # Início: ocupação, indicadores e hóspedes atuais
+│   ├── quartos.html          # Mapa dos quartos por andar
+│   ├── reservas.html         # Reservar e cancelar
+│   ├── frigobar.html         # Lançar consumo e ver estoque
+│   ├── app.js                # Regras de reservas e frigobar (compartilhado)
+│   └── css/style.css         # Tema visual (claro e escuro)
 │
 ├── src/main/                 # Versão original em Spring Boot + Thymeleaf (referência de estudo)
 ├── console-app/              # Versão original em Java puro para terminal (referência de estudo)

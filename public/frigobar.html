@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JavaHotel · Frigobar</title>
+    <meta name="description" content="Consumo e estoque do frigobar do JavaHotel.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="frigobar">
+
+    <header class="topo">
+        <div class="container">
+            <a class="marca" href="index.html"><span class="marca-simbolo">J</span>JavaHotel</a>
+            <nav class="nav" aria-label="Principal">
+                <a href="index.html" data-nav="inicio">Início</a>
+                <a href="quartos.html" data-nav="quartos">Quartos</a>
+                <a href="reservas.html" data-nav="reservas">Reservas</a>
+                <a href="frigobar.html" data-nav="frigobar">Frigobar</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+
+            <header class="cabecalho-pagina">
+                <span class="sobretitulo">Serviço de quarto</span>
+                <h1>Frigobar</h1>
+                <p>Lance o que cada hóspede consumiu. O valor vai direto para a conta do quarto.</p>
+            </header>
+
+            <div class="grade-2">
+                <section class="cartao">
+                    <h2>Lançar consumo</h2>
+                    <p class="descricao">Escolha o quarto, o produto e a quantidade.</p>
+                    <p class="aviso" id="aviso-sem-hospede" hidden>
+                        Nenhum quarto está ocupado. <a href="reservas.html">Faça uma reserva</a> para lançar consumo.
+                    </p>
+                    <form id="form-consumo">
+                        <div class="campo">
+                            <label for="sel-quarto-consumo">Quarto</label>
+                            <select id="sel-quarto-consumo" name="numero" required></select>
+                        </div>
+                        <div class="campos-2">
+                            <div class="campo">
+                                <label for="sel-produto">Produto</label>
+                                <select id="sel-produto" name="produto" required></select>
+                            </div>
+                            <div class="campo">
+                                <label for="quantidade">Quantidade</label>
+                                <input id="quantidade" type="number" name="quantidade" min="1" value="1" inputmode="numeric" required>
+                            </div>
+                        </div>
+                        <div class="resumo">
+                            <span>Total a lançar</span>
+                            <strong id="resumo-total">R$ 0,00</strong>
+                        </div>
+                        <button type="submit" class="botao cheio">Lançar no quarto</button>
+                    </form>
+                </section>
+
+                <section class="cartao">
+                    <div class="secao-titulo" style="margin-bottom: 6px">
+                        <h2>Estoque</h2>
+                        <span class="link-sutil" id="total-itens"></span>
+                    </div>
+                    <p class="descricao">Com 5 unidades ou menos, o item fica em alerta.</p>
+                    <ul class="estoque" id="lista-estoque"></ul>
+                </section>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="rodape">
+        <div class="container">
+            <span>JavaHotel · projeto de estudos · dados salvos neste navegador</span>
+            <button type="button" id="redefinir">Restaurar dados de exemplo</button>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

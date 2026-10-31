@@ -4,5 +4,6 @@
     "java.project.referencedLibraries": [
         "console-app/lib/**/*.jar"
     ],
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.compile.nullAnalysis.mode": "automatic"
 }

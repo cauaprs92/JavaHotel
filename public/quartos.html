@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JavaHotel · Quartos</title>
+    <meta name="description" content="Mapa dos quartos do JavaHotel.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="quartos">
+
+    <header class="topo">
+        <div class="container">
+            <a class="marca" href="index.html"><span class="marca-simbolo">J</span>JavaHotel</a>
+            <nav class="nav" aria-label="Principal">
+                <a href="index.html" data-nav="inicio">Início</a>
+                <a href="quartos.html" data-nav="quartos">Quartos</a>
+                <a href="reservas.html" data-nav="reservas">Reservas</a>
+                <a href="frigobar.html" data-nav="frigobar">Frigobar</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+
+            <header class="cabecalho-pagina">
+                <span class="sobretitulo">Mapa do hotel</span>
+                <h1>Quartos</h1>
+                <p>Quatro andares, cinco quartos em cada. Toque em um quarto para ver os detalhes.</p>
+            </header>
+
+            <div class="barra-filtros">
+                <div class="segmentado" role="group" aria-label="Filtrar quartos">
+                    <button type="button" data-filtro="todos" aria-pressed="true">Todos<span class="contagem"></span></button>
+                    <button type="button" data-filtro="livres" aria-pressed="false">Livres<span class="contagem"></span></button>
+                    <button type="button" data-filtro="ocupados" aria-pressed="false">Ocupados<span class="contagem"></span></button>
+                </div>
+                <div class="legenda" aria-hidden="true">
+                    <span><i class="ponto"></i>Livre</span>
+                    <span><i class="ponto ocupado"></i>Ocupado</span>
+                </div>
+            </div>
+
+            <div id="mapa-quartos"></div>
+
+        </div>
+    </main>
+
+    <dialog id="dialogo-quarto" aria-labelledby="dialogo-titulo">
+        <div class="dialogo-corpo">
+            <div class="dialogo-topo">
+                <div>
+                    <span class="sobretitulo" id="dialogo-andar"></span>
+                    <h2 id="dialogo-titulo"></h2>
+                </div>
+                <button type="button" class="fechar" id="fechar-dialogo" aria-label="Fechar">×</button>
+            </div>
+            <dl class="detalhes" id="dialogo-detalhes"></dl>
+            <div class="botoes-dialogo" id="dialogo-botoes"></div>
+        </div>
+    </dialog>
+
+    <footer class="rodape">
+        <div class="container">
+            <span>JavaHotel · projeto de estudos · dados salvos neste navegador</span>
+            <button type="button" id="redefinir">Restaurar dados de exemplo</button>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

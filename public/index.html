@@ -3,92 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Hotel Java - Painel</title>
+    <title>JavaHotel · Início</title>
+    <meta name="description" content="Painel do JavaHotel: ocupação, hóspedes e frigobar.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body data-page="inicio">
 
-    <header>
-        <h1>Hotel Java</h1>
-        <p>Sistema de reservas e frigobar</p>
+    <header class="topo">
+        <div class="container">
+            <a class="marca" href="index.html"><span class="marca-simbolo">J</span>JavaHotel</a>
+            <nav class="nav" aria-label="Principal">
+                <a href="index.html" data-nav="inicio">Início</a>
+                <a href="quartos.html" data-nav="quartos">Quartos</a>
+                <a href="reservas.html" data-nav="reservas">Reservas</a>
+                <a href="frigobar.html" data-nav="frigobar">Frigobar</a>
+            </nav>
+        </div>
     </header>
 
     <main>
+        <div class="container">
 
-        <div id="alerta" class="alerta" hidden></div>
+            <section class="heroi">
+                <div class="heroi-texto">
+                    <span class="sobretitulo" id="data-hoje">Hoje</span>
+                    <h1>Tudo em ordem,<br><em>quarto a quarto.</em></h1>
+                    <p>Acompanhe a ocupação, receba hóspedes e controle o frigobar em um só lugar.</p>
+                    <div class="acoes">
+                        <a class="botao" href="reservas.html">Nova reserva</a>
+                        <a class="botao contorno" href="quartos.html">Ver quartos</a>
+                    </div>
+                </div>
 
-        <section class="cartoes">
+                <div class="cartao ocupacao">
+                    <div class="anel" id="anel" role="img" aria-label="Taxa de ocupação">
+                        <div class="anel-valor"><span id="anel-pct">0%</span><small>ocupação</small></div>
+                    </div>
+                    <p><strong id="ocupados-texto">0 de 20</strong> quartos ocupados</p>
+                </div>
+            </section>
 
-            <div class="cartao">
-                <h2>Reservar Quarto</h2>
-                <form id="form-reservar">
-                    <label>Numero do quarto</label>
-                    <input type="number" name="numero" min="1" required>
+            <section class="indicadores" aria-label="Resumo">
+                <div class="indicador"><span>Quartos livres</span><strong id="ind-livres">0</strong></div>
+                <div class="indicador"><span>Hóspedes</span><strong id="ind-hospedes">0</strong></div>
+                <div class="indicador"><span>Consumo do frigobar</span><strong id="ind-consumo">R$ 0,00</strong></div>
+                <div class="indicador"><span>Itens em estoque</span><strong id="ind-estoque">0</strong></div>
+            </section>
 
-                    <label>Nome do hospede</label>
-                    <input type="text" name="nome" required>
+            <section class="secao">
+                <div class="secao-titulo"><h2>Por onde começar</h2></div>
+                <div class="atalhos">
+                    <a class="atalho" href="quartos.html">
+                        <span class="atalho-num">01</span>
+                        <h3>Quartos</h3>
+                        <p>O mapa dos 20 quartos, por andar, com quem está hospedado em cada um.</p>
+                        <span class="seta" aria-hidden="true">→</span>
+                    </a>
+                    <a class="atalho" href="reservas.html">
+                        <span class="atalho-num">02</span>
+                        <h3>Reservas</h3>
+                        <p>Registre a chegada de um hóspede ou encerre uma reserva.</p>
+                        <span class="seta" aria-hidden="true">→</span>
+                    </a>
+                    <a class="atalho" href="frigobar.html">
+                        <span class="atalho-num">03</span>
+                        <h3>Frigobar</h3>
+                        <p>Lance o consumo de cada quarto e acompanhe o estoque.</p>
+                        <span class="seta" aria-hidden="true">→</span>
+                    </a>
+                </div>
+            </section>
 
-                    <label>E-mail</label>
-                    <input type="email" name="email" required>
+            <section class="secao">
+                <div class="secao-titulo">
+                    <h2>Hospedados agora</h2>
+                    <a class="link-sutil" href="reservas.html">Ver todas as reservas →</a>
+                </div>
+                <div id="lista-hospedes"></div>
+            </section>
 
-                    <label>Telefone</label>
-                    <input type="text" name="telefone" required>
-
-                    <button type="submit">Reservar</button>
-                </form>
-            </div>
-
-            <div class="cartao">
-                <h2>Cancelar Reserva</h2>
-                <form id="form-cancelar">
-                    <label>Numero do quarto</label>
-                    <input type="number" name="numero" min="1" required>
-
-                    <button type="submit" class="botao-secundario">Cancelar</button>
-                </form>
-            </div>
-
-            <div class="cartao">
-                <h2>Registrar Consumo no Frigobar</h2>
-                <form id="form-consumo">
-                    <label>Numero do quarto</label>
-                    <input type="number" name="numero" min="1" required>
-
-                    <label>Produto</label>
-                    <select name="produto" id="select-produto" required></select>
-
-                    <label>Quantidade</label>
-                    <input type="number" name="quantidade" min="1" required>
-
-                    <button type="submit">Registrar</button>
-                </form>
-            </div>
-
-        </section>
-
-        <section>
-            <h2>Mapa de Quartos</h2>
-            <div class="grade-quartos" id="grade-quartos"></div>
-        </section>
-
-        <section>
-            <h2>Produtos do Frigobar</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Produto</th>
-                        <th>Preco</th>
-                        <th>Estoque</th>
-                    </tr>
-                </thead>
-                <tbody id="tabela-produtos"></tbody>
-            </table>
-        </section>
-
+        </div>
     </main>
 
-    <footer>
-        <p>Projeto de estudos - versao estatica (dados salvos no navegador)</p>
+    <footer class="rodape">
+        <div class="container">
+            <span>JavaHotel · projeto de estudos · dados salvos neste navegador</span>
+            <button type="button" id="redefinir">Restaurar dados de exemplo</button>
+        </div>
     </footer>
 
     <script src="app.js"></script>
