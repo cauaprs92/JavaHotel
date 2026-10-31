@@ -4,8 +4,8 @@
 
 ### Sistema de reservas de hotel com frigobar
 
-<a href="https://javahotel-peach.vercel.app/">
-  <img src="https://img.shields.io/badge/🌐_ACESSAR_SITE-javahotel--peach.vercel.app-2563eb?style=for-the-badge&labelColor=0f172a" alt="Acessar site" />
+<a href="https://javahotel-two.vercel.app/">
+  <img src="https://img.shields.io/badge/🌐_ACESSAR_SITE-javahotel--two.vercel.app-2563eb?style=for-the-badge&labelColor=0f172a" alt="Acessar site" />
 </a>
 
 <br/><br/>
@@ -14,7 +14,7 @@
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)](https://developer.mozilla.org/docs/Web/CSS)
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org)
-[![Deploy](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://javahotel-peach.vercel.app/)
+[![Deploy](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://javahotel-two.vercel.app/)
 
 </div>
 
@@ -24,7 +24,7 @@
 
 <div align="center">
 
-**Aplicação em produção:** [javahotel-peach.vercel.app](https://javahotel-peach.vercel.app/)
+**Aplicação em produção:** [javahotel-two.vercel.app](https://javahotel-two.vercel.app/)
 
 </div>
 
