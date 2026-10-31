@@ -916,7 +916,7 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 /* Card largo: número | hóspede | andar e frigobar | ações */
 .reserva {
     display: grid;
-    grid-template-columns: 2.6rem minmax(0, 1fr) 300px auto;
+    grid-template-columns: 6.4rem minmax(0, 1fr) 340px auto;
     grid-template-areas: "num quem info acoes";
     gap: 0 28px;
     align-items: center;
@@ -944,13 +944,27 @@ select:disabled { opacity: .55; cursor: not-allowed; }
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--brass) 18%, transparent);
 }
 
+/* Código da reserva: o destaque do card */
 .reserva-num {
     grid-area: num;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     font-family: var(--serif);
-    font-size: 2.1rem;
+    font-size: 1.75rem;
     line-height: 1;
     color: var(--brass);
-    min-width: 2ch;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.reserva-num small {
+    font-family: var(--sans);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
 
 .reserva-quem { grid-area: quem; display: block; min-width: 0; }
@@ -1554,26 +1568,32 @@ td .quarto-mini {
     .busca input { font-size: 0.9rem; padding-right: 8px; }
 
     /* No celular o card de reserva volta a ficar empilhado. */
+    /* Código no topo, ícones ao lado; hóspede e rodapé na largura toda. */
     .reserva {
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-            "num quem acoes"
-            ".   info info";
-        gap: 0 16px;
+            "num  acoes"
+            "quem quem"
+            "info info";
+        gap: 12px 12px;
         align-items: start;
         padding: 18px 14px 16px 18px;
     }
+    .reserva-num { flex-direction: row; align-items: baseline; gap: 10px; }
     .reserva-contato { display: block; }
     .reserva-contato + .reserva-contato::before { content: none; }
     .reserva-rodape {
         justify-content: space-between;
         min-height: 0;
-        margin-top: 14px;
+        flex-wrap: wrap;
+        white-space: normal;
+        margin-top: 0;
         padding: 12px 6px 0 0;
         border-left: 0;
         border-top: 1px solid var(--line);
     }
-    .reserva-acoes { margin: -6px -4px 0 0; }
+    .reserva-acoes { margin: -6px -4px 0 0; min-width: 0; }
+    .reserva-num { font-size: 1.4rem; }
     .dialogo-corpo { padding: 24px; }
     .indicador strong { font-size: 1.5rem; }
     .grade-quartos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

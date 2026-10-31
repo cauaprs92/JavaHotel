@@ -18,7 +18,6 @@ const STORAGE_KEY = "javahotel-estado";
 
 // As chaves são as gravadas nos dados; os rótulos são o que aparece na tela.
 const STATUS = { agendada: "Agendado", hospedada: "Hospedado", finalizada: "Finalizado" };
-const ORDEM_STATUS = { agendada: 0, hospedada: 1, finalizada: 2 };
 
 /* ---------- Estado ---------- */
 
@@ -53,12 +52,19 @@ function migrar(salvo) {
     return { versao: 2, proximoId: id, reservas, produtos: salvo.produtos };
 }
 
+/** Código de reserva: número único e sequencial, com 4 dígitos (0001, 0002...). Nunca é reaproveitado. */
+const gerarCodigo = (id) => String(id).padStart(4, "0");
+
 function carregar() {
     try {
         const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (salvo && Array.isArray(salvo.produtos)) {
             const atual = migrar(salvo);
-            if (Array.isArray(atual.reservas)) return atual;
+            if (Array.isArray(atual.reservas)) {
+                // Reservas criadas antes do código de reserva recebem um a partir do id.
+                atual.reservas.forEach((r) => { if (!r.codigo) r.codigo = gerarCodigo(r.id); });
+                return atual;
+            }
         }
     } catch (e) { /* storage indisponível ou corrompido */ }
     return estadoInicial();
@@ -78,6 +84,7 @@ const buscarReserva = (id) => estado.reservas.find((r) => r.id === id) || null;
 const reservaDoQuarto = (numero) => estado.reservas.find((r) => r.quarto === numero && ativa(r)) || null;
 const comStatus = (status) => estado.reservas.filter((r) => r.status === status);
 const porQuarto = (a, b) => a.quarto - b.quarto;
+const porCodigo = (a, b) => parseInt(a.codigo, 10) - parseInt(b.codigo, 10);
 
 /** Situação de cada quarto, calculada a partir das reservas ativas. */
 function quartos() {
@@ -99,8 +106,11 @@ function reservar(numero, nome, email, telefone) {
     if (!quartoValido(numero)) return erro("Escolha um quarto válido.");
     if (reservaDoQuarto(numero)) return erro(`O quarto ${numero} já está reservado.`);
     if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
+    const id = estado.proximoId++;
+    const codigo = gerarCodigo(id);
     estado.reservas.push({
-        id: estado.proximoId++,
+        id,
+        codigo,
         quarto: numero,
         hospede: { nome, email, telefone },
         status: "agendada",
@@ -109,7 +119,7 @@ function reservar(numero, nome, email, telefone) {
         checkinEm: null,
         finalizadaEm: null,
     });
-    return ok(`Reserva criada no quarto ${numero} para ${nome} · Agendado.`);
+    return ok(`Reserva #${codigo} criada no quarto ${numero} para ${nome} · Agendado.`);
 }
 
 function fazerCheckin(id) {
@@ -117,14 +127,14 @@ function fazerCheckin(id) {
     if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem fazer check-in.");
     r.status = "hospedada";
     r.checkinEm = agora();
-    return ok(`Check-in feito: ${r.hospede.nome} está no quarto ${r.quarto}.`);
+    return ok(`Check-in da reserva #${r.codigo} feito: ${r.hospede.nome} está no quarto ${r.quarto}.`);
 }
 
 function cancelarAgendamento(id) {
     const r = buscarReserva(id);
     if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem ser canceladas.");
     estado.reservas = estado.reservas.filter((x) => x !== r);
-    return ok(`Agendamento do quarto ${r.quarto} cancelado.`);
+    return ok(`Reserva #${r.codigo} cancelada. O quarto ${r.quarto} está livre.`);
 }
 
 /** Encerra a estadia. Com consumo no frigobar, exige a confirmação do pagamento. */
@@ -134,7 +144,7 @@ function finalizarReserva(id, pagamentoConfirmado) {
     if (r.valorConsumido > 0 && !pagamentoConfirmado) return erro("Confirme o pagamento do frigobar para encerrar.");
     r.status = "finalizada";
     r.finalizadaEm = agora();
-    return ok(`Reserva do quarto ${r.quarto} encerrada · Finalizado.`);
+    return ok(`Reserva #${r.codigo} encerrada · Finalizado.`);
 }
 
 /** Atualiza os dados do hóspede e, se pedido, troca de quarto (o consumo vai junto). */
@@ -149,7 +159,7 @@ function editarReserva(id, novoQuarto, nome, email, telefone) {
     }
     r.hospede = { nome, email, telefone };
     r.quarto = novoQuarto;
-    return ok(trocou ? `${nome} foi para o quarto ${novoQuarto}.` : `Reserva do quarto ${r.quarto} atualizada.`);
+    return ok(trocou ? `Reserva #${r.codigo}: ${nome} foi para o quarto ${novoQuarto}.` : `Reserva #${r.codigo} atualizada.`);
 }
 
 /**
@@ -301,7 +311,7 @@ function paginaInicio() {
     for (const r of hospedadas.slice(0, 6)) {
         const li = el("li");
         const quem = el("div");
-        quem.append(el("span", r.hospede.nome, "nome"), el("span", `Check-in ${dataHora(r.checkinEm)}`, "sub"));
+        quem.append(el("span", r.hospede.nome, "nome"), el("span", `Reserva #${r.codigo} · check-in ${dataHora(r.checkinEm)}`, "sub"));
         li.append(el("span", n2(r.quarto), "num"), quem, el("span", brl(r.valorConsumido), "valor"));
         ul.append(li);
     }
@@ -348,6 +358,7 @@ function paginaQuartos() {
 
         const r = q.reserva;
         if (r) {
+            linha("Código da reserva", `#${r.codigo}`);
             linha("Situação", seloStatus(r.status));
             linha("Hóspede", r.hospede.nome);
             linha("Telefone", r.hospede.telefone);
@@ -470,7 +481,7 @@ function paginaReservas() {
         aberta = r.id;
         const finalizada = r.status === "finalizada";
 
-        $("reserva-sobretitulo").textContent = `Quarto ${n2(r.quarto)} · ${andar(r.quarto)}º andar`;
+        $("reserva-sobretitulo").textContent = `Reserva #${r.codigo} · Quarto ${n2(r.quarto)} · ${andar(r.quarto)}º andar`;
         $("reserva-titulo").textContent = finalizada ? "Detalhes da reserva" : "Editar reserva";
         $("reserva-selo").replaceChildren(seloStatus(r.status));
 
@@ -536,13 +547,14 @@ function paginaReservas() {
         aberta = r.id;
         confirmacaoVeioDaEdicao = veioDaEdicao;
         acaoPendente = r.status === "agendada" ? "cancelar" : "finalizar";
+        const codigo = el("strong", `#${r.codigo}`);
         const quarto = el("strong", n2(r.quarto));
         const nome = el("strong", r.hospede.nome);
 
         if (acaoPendente === "cancelar") {
             $("confirmar-titulo").textContent = "Cancelar agendamento?";
             $("confirmar-texto").replaceChildren(
-                "A reserva de ", nome, " no quarto ", quarto,
+                "A reserva ", codigo, " de ", nome, " no quarto ", quarto,
                 " será apagada e o quarto ficará livre. Não dá para desfazer.",
             );
             $("confirmar-pagamento").hidden = true;
@@ -551,7 +563,7 @@ function paginaReservas() {
         } else {
             $("confirmar-titulo").textContent = "Encerrar reserva?";
             $("confirmar-texto").replaceChildren(
-                "A estadia de ", nome, " no quarto ", quarto,
+                "A reserva ", codigo, " de ", nome, " no quarto ", quarto,
                 " será encerrada com o status Finalizado e o quarto ficará livre.",
             );
             const temConsumo = r.valorConsumido > 0;
@@ -602,7 +614,9 @@ function paginaReservas() {
         const cartao = el("article", undefined, `reserva ${r.status}`);
         cartao.id = `reserva-${r.id}`;
 
-        const num = el("span", n2(r.quarto), "reserva-num");
+        // O código da reserva é o destaque do card; o quarto vai para o rodapé.
+        const num = el("span", undefined, "reserva-num");
+        num.append(el("small", "Código"), `#${r.codigo}`);
 
         const quem = el("span", undefined, "reserva-quem");
         const titulo = el("span", undefined, "reserva-titulo");
@@ -626,11 +640,11 @@ function paginaReservas() {
             });
             return b;
         };
-        acoes.append(botaoIcone(ICONE_OLHO, "icone-botao", `Ver a reserva do quarto ${r.quarto} (${r.hospede.nome})`,
+        acoes.append(botaoIcone(ICONE_OLHO, "icone-botao", `Ver a reserva #${r.codigo} (${r.hospede.nome})`,
             "Ver reserva", () => abrirReserva(r)));
         if (ativa(r)) {
             const dica = r.status === "agendada" ? "Cancelar agendamento" : "Encerrar reserva";
-            acoes.append(botaoIcone(ICONE_LIXEIRA, "icone-botao perigo", `${dica} do quarto ${r.quarto} (${r.hospede.nome})`,
+            acoes.append(botaoIcone(ICONE_LIXEIRA, "icone-botao perigo", `${dica}: reserva #${r.codigo} (${r.hospede.nome})`,
                 dica, () => pedirConfirmacao(r, false)));
         }
 
@@ -642,7 +656,9 @@ function paginaReservas() {
             direita = el("span", r.status === "finalizada" ? "Frigobar pago " : "Frigobar ");
             direita.append(el("strong", brl(r.valorConsumido)));
         }
-        rodape.append(el("span", `${andar(r.quarto)}º andar`), direita);
+        const local = el("span", "Quarto ");
+        local.append(el("strong", n2(r.quarto)), ` · ${andar(r.quarto)}º andar`);
+        rodape.append(local, direita);
 
         cartao.append(num, quem, acoes, rodape);
         cartao.addEventListener("click", () => abrirReserva(r));
@@ -683,12 +699,18 @@ function paginaReservas() {
 
     function combinaBusca(r, termo) {
         if (!termo) return true;
-        const texto = normalizar([r.hospede.nome, r.hospede.email, r.hospede.telefone].join(" "));
+        // Começando com "#", procura só pelo código da reserva.
+        if (termo.startsWith("#")) {
+            const cod = soDigitos(termo);
+            return cod !== "" && parseInt(cod, 10) === parseInt(r.codigo, 10);
+        }
+        const texto = normalizar([`#${r.codigo}`, r.hospede.nome, r.hospede.email, r.hospede.telefone].join(" "));
         if (texto.includes(normalizar(termo))) return true;
         const digitos = soDigitos(termo);
         if (!digitos) return false;
-        // Número do quarto ("7" ou "07") ou trecho do telefone só com números.
-        return parseInt(digitos, 10) === r.quarto || soDigitos(r.hospede.telefone).includes(digitos);
+        // Código da reserva ("7", "0007" ou "#0007"), número do quarto ou trecho do telefone.
+        const n = parseInt(digitos, 10);
+        return n === parseInt(r.codigo, 10) || n === r.quarto || soDigitos(r.hospede.telefone).includes(digitos);
     }
 
     function doStatus(status) {
@@ -733,7 +755,7 @@ function paginaReservas() {
         } else if (filtroOrdem.value === "consumo") {
             visiveis.sort((a, b) => b.valorConsumido - a.valorConsumido || a.quarto - b.quarto);
         } else {
-            visiveis.sort((a, b) => a.quarto - b.quarto || ORDEM_STATUS[a.status] - ORDEM_STATUS[b.status] || b.id - a.id);
+            visiveis.sort(porCodigo); // padrão: pelo código da reserva
         }
 
         $("total-reservas").textContent = visiveis.length === base.length
@@ -767,7 +789,7 @@ function paginaReservas() {
         busca.value = "";
         filtroAndar.value = "";
         filtroFrigobar.value = "";
-        filtroOrdem.value = "quarto";
+        filtroOrdem.value = "codigo";
         renderLista();
         busca.focus();
     }
