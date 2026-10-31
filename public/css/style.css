@@ -826,17 +826,18 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 
 .reservas {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 14px;
+    gap: 12px;
 }
 
+/* Card largo: número | hóspede | andar e frigobar | ações */
 .reserva {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0 18px;
-    align-items: start;
+    grid-template-columns: 2.6rem minmax(0, 1fr) 270px auto;
+    grid-template-areas: "num quem info acoes";
+    gap: 0 28px;
+    align-items: center;
     width: 100%;
-    padding: 20px 16px 18px 22px;
+    padding: 20px 18px 20px 28px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -860,6 +861,7 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 }
 
 .reserva-num {
+    grid-area: num;
     font-family: var(--serif);
     font-size: 2.1rem;
     line-height: 1;
@@ -867,7 +869,7 @@ select:disabled { opacity: .55; cursor: not-allowed; }
     min-width: 2ch;
 }
 
-.reserva-quem { display: block; min-width: 0; padding-top: 2px; }
+.reserva-quem { grid-area: quem; display: block; min-width: 0; }
 
 .reserva-nome {
     display: block;
@@ -879,22 +881,29 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 }
 
 .reserva-contato {
-    display: block;
+    display: inline;
     font-size: 0.84rem;
     color: var(--muted);
     overflow-wrap: anywhere;
 }
 
+.reserva-contato + .reserva-contato::before {
+    content: "·";
+    margin: 0 8px;
+}
+
 .reserva-rodape {
-    grid-column: 2 / -1;
+    grid-area: info;
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-top: 14px;
-    padding: 12px 6px 0 0;
-    border-top: 1px solid var(--line);
-    font-size: 0.84rem;
+    gap: 20px;
+    padding-left: 28px;
+    border-left: 1px solid var(--line);
+    min-height: 40px;
+    font-size: 0.86rem;
     color: var(--muted);
+    white-space: nowrap;
 }
 
 .reserva-rodape strong {
@@ -904,9 +913,9 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 }
 
 .reserva-acoes {
+    grid-area: acoes;
     display: flex;
     gap: 2px;
-    margin: -6px -4px 0 0;
 }
 
 .icone-botao {
@@ -1348,6 +1357,28 @@ td .quarto-mini {
     .reservas { grid-template-columns: 1fr; }
     .form-rodape .botao { width: 100%; }
     .dialogo-acoes { flex-direction: column-reverse; }
+
+    /* No celular o card de reserva volta a ficar empilhado. */
+    .reserva {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "num quem acoes"
+            ".   info info";
+        gap: 0 16px;
+        align-items: start;
+        padding: 18px 14px 16px 18px;
+    }
+    .reserva-contato { display: block; }
+    .reserva-contato + .reserva-contato::before { content: none; }
+    .reserva-rodape {
+        justify-content: space-between;
+        min-height: 0;
+        margin-top: 14px;
+        padding: 12px 6px 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+    }
+    .reserva-acoes { margin: -6px -4px 0 0; }
     .dialogo-corpo { padding: 24px; }
     .indicador strong { font-size: 1.5rem; }
     .grade-quartos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
