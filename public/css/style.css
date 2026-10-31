@@ -810,6 +810,144 @@ select:disabled { opacity: .55; cursor: not-allowed; }
     gap: 10px;
 }
 
+/* ---------- Reservas ---------- */
+
+.layout-reservas { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+
+.cartao.fixo { position: sticky; top: 92px; }
+
+.layout-reservas .secao-titulo { margin-top: 4px; }
+
+.reservas {
+    display: grid;
+    gap: 12px;
+}
+
+.reserva {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0 18px;
+    align-items: start;
+    padding: 20px 16px 18px 22px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.reserva:hover { border-color: color-mix(in srgb, var(--brass) 45%, var(--line)); }
+
+.reserva.destaque {
+    border-color: var(--brass);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--brass) 18%, transparent);
+}
+
+.reserva-num {
+    font-family: var(--serif);
+    font-size: 2.1rem;
+    line-height: 1;
+    color: var(--brass);
+    min-width: 2ch;
+}
+
+.reserva-quem { min-width: 0; padding-top: 2px; }
+
+.reserva-nome {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.reserva-contato {
+    display: block;
+    font-size: 0.84rem;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.reserva-rodape {
+    grid-column: 2 / -1;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 12px 6px 0 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.84rem;
+    color: var(--muted);
+}
+
+.reserva-rodape strong {
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.lixeira {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-top: -4px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .15s, background .15s, border-color .15s;
+}
+
+.lixeira svg { width: 18px; height: 18px; }
+
+.lixeira:hover,
+.lixeira:focus-visible {
+    color: var(--busy);
+    background: var(--busy-bg);
+    border-color: color-mix(in srgb, var(--busy) 30%, transparent);
+    outline: none;
+}
+
+/* Confirmação de encerramento */
+
+.icone-perigo {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 18px;
+    border-radius: 50%;
+    background: var(--busy-bg);
+    color: var(--busy);
+}
+
+.icone-perigo svg { width: 24px; height: 24px; }
+
+#dialogo-encerrar h2 { font-size: 1.6rem; }
+
+.dialogo-texto {
+    margin: 10px 0 26px;
+    color: var(--muted);
+    font-size: 0.94rem;
+}
+
+.dialogo-texto strong { color: var(--ink); font-weight: 600; }
+
+.botoes-lado {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.botao.perigo-cheio {
+    background: var(--busy);
+    color: var(--bg);
+}
+
+.botao.perigo-cheio:hover { background: color-mix(in srgb, var(--busy) 88%, var(--ink)); }
+
 /* ---------- Tabelas ---------- */
 
 .tabela-envoltorio {
@@ -1130,6 +1268,7 @@ td .quarto-mini {
 @media (max-width: 900px) {
     .heroi,
     .grade-2 { grid-template-columns: 1fr; }
+    .cartao.fixo { position: static; }
     .indicadores { grid-template-columns: repeat(2, 1fr); }
     .atalhos { grid-template-columns: 1fr; }
     .atalho { min-height: 0; }

@@ -67,7 +67,7 @@ function cancelar(numero) {
     q.ocupado = false;
     q.hospede = null;
     q.valorConsumido = 0;
-    return ok(`Reserva do quarto ${numero} cancelada.`);
+    return ok(`Reserva do quarto ${numero} encerrada.`);
 }
 
 /**
@@ -103,7 +103,10 @@ function registrarConsumo(numero, itens) {
 
 /* ---------- Utilidades ---------- */
 
-const formatoBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+// Ícone fixo (sem dados do usuário), por isso pode ir via innerHTML.
+const ICONE_LIXEIRA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+
+const formatoBRL =new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const brl = (v) => formatoBRL.format(v);
 const $ = (id) => document.getElementById(id);
 const ocupados = () => estado.quartos.filter((q) => q.ocupado);
@@ -247,7 +250,7 @@ function paginaQuartos() {
             linha("Consumo do frigobar", brl(q.valorConsumido));
             const consumo = el("a", "Lançar consumo no frigobar", "botao");
             consumo.href = `frigobar.html?quarto=${q.numero}`;
-            const cancelarBtn = el("button", "Cancelar reserva", "botao perigo");
+            const cancelarBtn = el("button", "Encerrar reserva", "botao perigo");
             cancelarBtn.type = "button";
             cancelarBtn.addEventListener("click", () => {
                 const r = cancelar(q.numero);
@@ -327,57 +330,98 @@ function paginaQuartos() {
 
 function paginaReservas() {
     const formReservar = $("form-reservar");
-    const formCancelar = $("form-cancelar");
     const selLivre = $("sel-quarto-livre");
-    const selOcupado = $("sel-quarto-ocupado");
+    const lista = $("lista-reservas");
+    const dialogo = $("dialogo-encerrar");
+    let aEncerrar = null;
+
+    $("encerrar-voltar").addEventListener("click", () => dialogo.close());
+    dialogo.addEventListener("click", (ev) => { if (ev.target === dialogo) dialogo.close(); });
+    $("encerrar-confirmar").addEventListener("click", () => {
+        if (aEncerrar === null) return;
+        const r = cancelar(aEncerrar);
+        avisar(r);
+        if (r.ok) salvar();
+        aEncerrar = null;
+        dialogo.close();
+        render();
+    });
+
+    function pedirEncerramento(q) {
+        aEncerrar = q.numero;
+        const texto = $("encerrar-texto");
+        texto.replaceChildren(
+            "O quarto ", el("strong", String(q.numero).padStart(2, "0")),
+            " de ", el("strong", q.hospede.nome),
+            ` será liberado e o consumo do frigobar (${brl(q.valorConsumido)}) será zerado. Não dá para desfazer.`,
+        );
+        dialogo.showModal();
+        $("encerrar-voltar").focus();
+    }
+
+    function cartaoReserva(q) {
+        const cartao = el("article", undefined, "reserva");
+        cartao.id = `reserva-${q.numero}`;
+
+        const num = el("span", String(q.numero).padStart(2, "0"), "reserva-num");
+
+        const quem = el("div", undefined, "reserva-quem");
+        quem.append(
+            el("span", q.hospede.nome, "reserva-nome"),
+            el("span", q.hospede.email, "reserva-contato"),
+            el("span", q.hospede.telefone, "reserva-contato"),
+        );
+
+        const lixeira = el("button", undefined, "lixeira");
+        lixeira.type = "button";
+        lixeira.title = "Encerrar reserva";
+        lixeira.setAttribute("aria-label", `Encerrar reserva do quarto ${q.numero} (${q.hospede.nome})`);
+        lixeira.innerHTML = ICONE_LIXEIRA;
+        lixeira.addEventListener("click", () => pedirEncerramento(q));
+
+        const rodape = el("div", undefined, "reserva-rodape");
+        const frigobar = el("span", "Frigobar ");
+        frigobar.append(el("strong", brl(q.valorConsumido)));
+        rodape.append(el("span", `${andar(q.numero)}º andar`), frigobar);
+
+        cartao.append(num, quem, lixeira, rodape);
+        return cartao;
+    }
 
     function render() {
         preencherSelect(selLivre,
             livres().map((q) => [q.numero, `Quarto ${String(q.numero).padStart(2, "0")} · ${andar(q.numero)}º andar`]),
             "Nenhum quarto livre");
-        preencherSelect(selOcupado,
-            ocupados().map((q) => [q.numero, `Quarto ${String(q.numero).padStart(2, "0")} · ${q.hospede.nome}`]),
-            "Nenhuma reserva ativa");
         formReservar.querySelector("button").disabled = selLivre.disabled;
-        formCancelar.querySelector("button").disabled = selOcupado.disabled;
 
-        const tbody = $("tabela-reservas");
-        tbody.replaceChildren();
         const ativos = ocupados();
         $("total-reservas").textContent = ativos.length === 1 ? "1 reserva" : `${ativos.length} reservas`;
         if (!ativos.length) {
-            const tr = el("tr");
-            const td = el("td", "Nenhuma reserva ativa ainda.");
-            td.colSpan = 4;
-            td.style.color = "var(--muted)";
-            tr.append(td);
-            tbody.append(tr);
+            const vazio = el("div", undefined, "vazio");
+            vazio.append(el("p", "Nenhuma reserva ativa. As novas reservas aparecem aqui."));
+            vazio.firstChild.style.margin = "0";
+            lista.replaceChildren(vazio);
             return;
         }
-        for (const q of ativos) {
-            const tr = el("tr");
-            const tdNum = el("td");
-            tdNum.append(el("span", String(q.numero).padStart(2, "0"), "quarto-mini"));
-            const tdContato = el("td");
-            tdContato.append(el("div", q.hospede.email), el("div", q.hospede.telefone, "quarto-andar"));
-            tr.append(tdNum, el("td", q.hospede.nome), tdContato, el("td", brl(q.valorConsumido), "num"));
-            tbody.append(tr);
-        }
+        lista.replaceChildren(...ativos.map(cartaoReserva));
     }
 
     ligar(formReservar, (d) => reservar(parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim()), render);
-    ligar(formCancelar, (d) => cancelar(parseInt(d.numero, 10)), render);
 
     render();
 
-    // Vindo do mapa de quartos: já deixa o quarto escolhido.
+    // Vindo do mapa de quartos: escolhe o quarto livre ou destaca a reserva.
     const pedido = parametro("quarto");
     if (pedido) {
         if ([...selLivre.options].some((o) => o.value === pedido)) {
             selLivre.value = pedido;
             formReservar.querySelector("[name=nome]").focus();
-        } else if ([...selOcupado.options].some((o) => o.value === pedido)) {
-            selOcupado.value = pedido;
+        } else {
+            const cartao = $(`reserva-${pedido}`);
+            if (cartao) {
+                cartao.classList.add("destaque");
+                cartao.scrollIntoView({ block: "center" });
+            }
         }
     }
 }
