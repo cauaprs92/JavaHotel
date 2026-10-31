@@ -57,7 +57,7 @@ Agendado ──check-in──▶ Hospedado ──encerrar (pagamento do frigobar
 ```
 JavaHotel/
 ├── public/                   # Site publicado na Vercel (estático)
-│   ├── index.html            # Início: ocupação, indicadores e hóspedes atuais
+│   ├── index.html            # Home: ocupação, reservas por status, indicadores e hóspedes atuais
 │   ├── quartos.html          # Mapa dos quartos por andar
 │   ├── reservas.html         # Reservar e cancelar
 │   ├── frigobar.html         # Lançar consumo e ver estoque

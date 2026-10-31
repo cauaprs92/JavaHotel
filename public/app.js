@@ -269,7 +269,7 @@ function ligar(form, acao, aoTerminar) {
     });
 }
 
-/* ---------- Página: Início ---------- */
+/* ---------- Página: Home ---------- */
 
 function paginaInicio() {
     const qs = quartos();
@@ -291,6 +291,8 @@ function paginaInicio() {
         el("br"),
         `${hospedadas.length} hospedados · ${agendadas.length} agendados`,
     );
+
+    desenharPizza();
 
     $("ind-livres").textContent = total - reservados;
     $("ind-hospedes").textContent = hospedadas.length;
@@ -316,6 +318,101 @@ function paginaInicio() {
         ul.append(li);
     }
     lista.append(ul);
+}
+
+/* ----- Gráfico de pizza: reservas por status ----- */
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const ORDEM_PIZZA = ["agendada", "hospedada", "finalizada"]; // ordem fixa: a cor segue o status
+
+function svgEl(tag, atributos) {
+    const e = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(atributos)) e.setAttribute(k, v);
+    return e;
+}
+
+const formatoPct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+
+/** Porcentagem de cada valor sobre o total, com uma casa decimal ("28,6%"). Quantidades iguais dão o mesmo texto. */
+function porcentagens(valores) {
+    const total = valores.reduce((s, v) => s + v, 0);
+    return valores.map((v) => formatoPct.format(total ? v / total : 0));
+}
+
+function desenharPizza() {
+    const caixa = $("pizza");
+    const svg = $("pizza-svg");
+    const legenda = $("pizza-legenda");
+    const dica = $("pizza-dica");
+    const contagens = ORDEM_PIZZA.map((s) => comStatus(s).length);
+    const total = contagens.reduce((s, v) => s + v, 0);
+    const pcts = porcentagens(contagens);
+    const plural = (n) => (n === 1 ? "1 reserva" : `${n} reservas`);
+
+    $("pizza-total").textContent = plural(total);
+    $("pizza-resumo").textContent = total
+        ? "Reservas por status: " + ORDEM_PIZZA.map((s, i) => `${STATUS[s]} ${contagens[i]} (${pcts[i]})`).join(", ") + "."
+        : "Nenhuma reserva ainda.";
+    svg.replaceChildren();
+    legenda.replaceChildren();
+
+    const C = 100;
+    const R = 96;
+    if (!total) {
+        svg.append(svgEl("circle", { cx: C, cy: C, r: R, class: "fatia vazia" }));
+    }
+
+    // Destaque: a fatia e a linha da legenda do mesmo status acendem juntas.
+    function destacar(status) {
+        if (status) { caixa.dataset.ativo = status; legenda.dataset.ativo = status; }
+        else { delete caixa.dataset.ativo; delete legenda.dataset.ativo; }
+        svg.querySelectorAll(".fatia").forEach((f) => f.classList.toggle("ativa", f.dataset.status === status));
+        legenda.querySelectorAll("li").forEach((li) => li.classList.toggle("ativa", li.dataset.status === status));
+    }
+
+    function mostrarDica(ev, i) {
+        const s = ORDEM_PIZZA[i];
+        dica.replaceChildren(el("strong", STATUS[s]), el("span", `${plural(contagens[i])} · ${pcts[i]}`));
+        dica.hidden = false;
+        const r = caixa.getBoundingClientRect();
+        const x = Math.min(ev.clientX - r.left + 14, r.width - dica.offsetWidth);
+        const y = Math.max(ev.clientY - r.top - dica.offsetHeight - 10, 0);
+        dica.style.left = `${Math.max(0, x)}px`;
+        dica.style.top = `${y}px`;
+    }
+
+    let angulo = -Math.PI / 2; // começa no topo, sentido horário
+    ORDEM_PIZZA.forEach((status, i) => {
+        const n = contagens[i];
+        if (n > 0) {
+            const fracao = n / total;
+            let fatia;
+            if (fracao === 1) {
+                fatia = svgEl("circle", { cx: C, cy: C, r: R });
+            } else {
+                const fim = angulo + fracao * 2 * Math.PI;
+                const p = (a) => `${(C + R * Math.cos(a)).toFixed(3)} ${(C + R * Math.sin(a)).toFixed(3)}`;
+                const grande = fracao > 0.5 ? 1 : 0;
+                fatia = svgEl("path", { d: `M ${C} ${C} L ${p(angulo)} A ${R} ${R} 0 ${grande} 1 ${p(fim)} Z` });
+                angulo = fim;
+            }
+            fatia.setAttribute("class", `fatia ${status}`);
+            fatia.dataset.status = status;
+            fatia.addEventListener("pointerenter", (ev) => { destacar(status); mostrarDica(ev, i); });
+            fatia.addEventListener("pointermove", (ev) => mostrarDica(ev, i));
+            fatia.addEventListener("pointerleave", () => { destacar(null); dica.hidden = true; });
+            svg.append(fatia);
+        }
+
+        const li = el("li");
+        li.dataset.status = status;
+        const nome = el("span", undefined, "pizza-nome");
+        nome.append(el("i", undefined, `amostra ${status}`), STATUS[status]);
+        li.append(nome, el("span", String(n), "pizza-qtd"), el("span", pcts[i], "pizza-pct"));
+        li.addEventListener("pointerenter", () => destacar(status));
+        li.addEventListener("pointerleave", () => destacar(null));
+        legenda.append(li);
+    });
 }
 
 /* ---------- Página: Quartos ---------- */
