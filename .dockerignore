@@ -1,9 +1,0 @@
-.git
-.github
-.vscode
-.claude
-target
-bin
-console-app
-banco.properties
-*.md
