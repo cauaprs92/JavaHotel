@@ -10,8 +10,7 @@ import org.springframework.stereotype.Component;
 /**
  * Abre conexões JDBC com o PostgreSQL.
  *
- * A URL, o usuário e a senha vêm do application.properties
- * (na sua máquina, do arquivo banco.properties; na nuvem, das variáveis de ambiente).
+ * A URL, o usuário e a senha vêm do arquivo banco.properties, na raiz do projeto.
  */
 @Component
 public class ConexaoBD {

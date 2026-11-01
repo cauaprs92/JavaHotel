@@ -15,7 +15,7 @@ public final class ErrosBD {
         String estado = e.getSQLState() == null ? "" : e.getSQLState();
         return switch (estado) {
             case "3D000" -> "O banco de dados não existe. Crie-o no PostgreSQL com: CREATE DATABASE javahotel;";
-            case "28P01", "28000" -> "Usuário ou senha do banco de dados incorretos. Confira o banco.properties (ou DB_USER e DB_PASSWORD).";
+            case "28P01", "28000" -> "Usuário ou senha do banco de dados incorretos. Confira o arquivo banco.properties.";
             case "42P01" -> "As tabelas do banco de dados não existem. Reinicie o servidor para criá-las.";
             case "40P01", "40001", "55P03" -> "O banco de dados estava ocupado. Tente de novo.";
             default -> estado.startsWith("08")
