@@ -48,7 +48,7 @@
                         </div>
                         <div class="campo">
                             <label for="telefone">Telefone</label>
-                            <input id="telefone" type="tel" name="telefone" autocomplete="tel" placeholder="(11) 90000-0000" required>
+                            <input id="telefone" type="tel" name="telefone" autocomplete="tel" inputmode="numeric" placeholder="(11) 90000-0000" maxlength="15" pattern="\(\d{2}\) \d{4,5}-\d{4}" title="Telefone com DDD, como (11) 90000-0000" required>
                         </div>
                     </div>
                     <div class="campos-reserva">
@@ -139,7 +139,7 @@
                     </div>
                     <div class="campo">
                         <label for="editar-telefone">Telefone</label>
-                        <input id="editar-telefone" type="tel" name="telefone" autocomplete="off" required>
+                        <input id="editar-telefone" type="tel" name="telefone" autocomplete="off" inputmode="numeric" placeholder="(11) 90000-0000" maxlength="15" pattern="\(\d{2}\) \d{4,5}-\d{4}" title="Telefone com DDD, como (11) 90000-0000" required>
                     </div>
                 </div>
                 <div class="campos-2">

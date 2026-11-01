@@ -182,6 +182,33 @@ function erroDePeriodo(entrada, saida, exigirFuturo) {
 const descreverConflito = (c) =>
     `O quarto ${c.quarto} já está reservado de ${dataCurta(c.entrada)} a ${dataCurta(c.saida)} (reserva #${c.codigo}).`;
 
+/* ---------- Telefone ---------- */
+
+// DDD + número: 11 dígitos no celular "(11) 90000-0000" ou 10 no fixo "(11) 3000-0000".
+const MAX_DIGITOS_TELEFONE = 11;
+const ERRO_TELEFONE = "Informe um telefone válido, como (11) 90000-0000.";
+
+/**
+ * Formata enquanto a pessoa digita: guarda só os números (no máximo 11) e coloca
+ * parênteses, espaço e hífen. O hífen só aparece quando há número depois dele,
+ * para o Backspace funcionar normalmente.
+ */
+function formatarTelefone(texto) {
+    const d = String(texto).replace(/\D/g, "").slice(0, MAX_DIGITOS_TELEFONE);
+    if (!d) return "";
+    if (d.length <= 2) return `(${d}`;
+    const ddd = d.slice(0, 2);
+    const resto = d.slice(2);
+    if (resto.length <= 4) return `(${ddd}) ${resto}`;
+    const corte = resto.length === 9 ? 5 : 4; // celular: 5 antes do hífen
+    return `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`;
+}
+
+/** Celular "(11) 90000-0000" (começa com 9) ou fixo "(11) 3000-0000" (começa com 2 a 5), com DDD de 11 a 99. */
+function telefoneValido(texto) {
+    return /^\([1-9]\d\) (9\d{4}|[2-5]\d{3})-\d{4}$/.test(texto);
+}
+
 /* ---------- Regras ---------- */
 
 const ok = (msg) => ({ ok: true, msg });
@@ -195,6 +222,7 @@ function reservar(numero, nome, email, telefone, entrada, saida) {
     const c = conflito(numero, entrada, saida);
     if (c) return erro(descreverConflito(c));
     if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
+    if (!telefoneValido(telefone)) return erro(ERRO_TELEFONE);
     const id = estado.proximoId++;
     const codigo = gerarCodigo(id);
     estado.reservas.push({
@@ -253,6 +281,7 @@ function editarReserva(id, novoQuarto, nome, email, telefone, entrada, saida) {
     const r = buscarReserva(id);
     if (!r || !ativa(r)) return erro("Essa reserva não pode mais ser editada.");
     if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
+    if (!telefoneValido(telefone)) return erro(ERRO_TELEFONE);
     if (!quartoValido(novoQuarto)) return erro("Escolha um quarto válido.");
     if (r.status === "hospedada") entrada = r.entrada;
     const problema = erroDePeriodo(entrada, saida, entrada !== r.entrada);
@@ -695,6 +724,11 @@ function paginaReservas() {
     const pagamentoOk = $("pagamento-ok");
     const botaoConfirmar = $("confirmar-acao");
 
+    // Telefone: aceita só números e formata como (11) 90000-0000 enquanto digita.
+    [formReservar.elements.telefone, formEditar.elements.telefone].forEach((campo) => {
+        campo.addEventListener("input", () => { campo.value = formatarTelefone(campo.value); });
+    });
+
     let aberta = null;            // id da reserva aberta no diálogo
     let acaoPendente = null;      // "finalizar" | "cancelar"
     let confirmacaoVeioDaEdicao = false;
@@ -737,7 +771,8 @@ function paginaReservas() {
         const campos = formEditar.elements;
         campos.nome.value = r.hospede.nome;
         campos.email.value = r.hospede.email;
-        campos.telefone.value = r.hospede.telefone;
+        // Reservas antigas podem ter o telefone em outro formato: já mostra formatado.
+        campos.telefone.value = finalizada ? r.hospede.telefone : formatarTelefone(r.hospede.telefone);
         campos.entrada.value = r.entrada;
         campos.saida.value = r.saida;
         [campos.nome, campos.email, campos.telefone, campos.saida, selEditarQuarto].forEach((c) => { c.disabled = finalizada; });
