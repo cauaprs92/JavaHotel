@@ -1,3 +1,6 @@
 target/
 bin/
 *.class
+
+# Senha do banco de dados local
+banco.properties

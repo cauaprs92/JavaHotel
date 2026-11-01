@@ -1,6 +1,8 @@
 /* ==========================================================
-   JavaHotel — regras de reservas e frigobar
-   Os dados ficam no localStorage do navegador.
+   JavaHotel — telas de reservas e frigobar
+   Os dados ficam no banco PostgreSQL. Este arquivo busca tudo pela
+   API do servidor Java (/api/estado) e envia cada alteração para ela;
+   quem valida as regras e grava no banco é o Java (HotelService).
    Cada página chama sua função pelo atributo data-page do <body>.
 
    Ciclo de uma reserva:
@@ -13,11 +15,11 @@
    quarto nunca podem ter períodos que se sobrepõem.
    ========================================================== */
 
-const TOTAL_QUARTOS = 20;
 const QUARTOS_POR_ANDAR = 5;
 const ESTOQUE_REFERENCIA = 20;
 const ESTOQUE_BAIXO = 5;
-const STORAGE_KEY = "javahotel-estado";
+const API = "api"; // mesmo endereço do site: http://localhost:8081/api
+const SEM_CONEXAO = "Sem conexão com o servidor do JavaHotel. Verifique se ele está rodando.";
 
 // As chaves são as gravadas nos dados; os rótulos são o que aparece na tela.
 const STATUS = { agendada: "Agendado", hospedada: "Hospedado", finalizada: "Finalizado" };
@@ -34,9 +36,6 @@ function somarDias(iso, dias) {
     return isoDoDia(new Date(a, m - 1, d + dias));
 }
 
-/** Dia (AAAA-MM-DD) de um horário completo, como "criadaEm". */
-const diaDe = (instante) => (instante ? isoDoDia(new Date(instante)) : null);
-
 const noites = (entrada, saida) => Math.round((Date.parse(saida) - Date.parse(entrada)) / 864e5);
 
 /** "31/10", ou "31/10/27" quando o ano é outro. */
@@ -45,94 +44,47 @@ function dataCurta(iso) {
     return a === hoje().slice(0, 4) ? `${d}/${m}` : `${d}/${m}/${a.slice(2)}`;
 }
 
-/* ---------- Estado ---------- */
+/* ---------- Estado (vem do banco de dados) ---------- */
 
-function estadoInicial() {
-    const produtos = [
-        { nomeProduto: "Água Mineral 500ml", preco: 3.5, quantidade: 20 },
-        { nomeProduto: "Refrigerante Lata", preco: 6.0, quantidade: 15 },
-        { nomeProduto: "Suco de Laranja", preco: 7.0, quantidade: 10 },
-        { nomeProduto: "Cerveja Long Neck", preco: 9.0, quantidade: 12 },
-        { nomeProduto: "Chocolate ao Leite", preco: 5.5, quantidade: 18 },
-    ];
-    return { versao: 2, proximoId: 1, reservas: [], produtos };
-}
+/**
+ * Cópia do que está no banco: quartos, reservas (com hóspede, código e total do frigobar)
+ * e produtos. É substituída por inteiro a cada carregarEstado().
+ */
+let estado = { quartos: [], reservas: [], produtos: [] };
 
-/** Versão antiga guardava o hóspede direto no quarto: vira reserva "hospedada". */
-function migrar(salvo) {
-    if (Array.isArray(salvo.reservas) || !Array.isArray(salvo.quartos)) return salvo;
-    const agora = new Date().toISOString();
-    let id = 1;
-    const reservas = salvo.quartos
-        .filter((q) => q.ocupado && q.hospede)
-        .map((q) => ({
-            id: id++,
-            quarto: q.numero,
-            hospede: { ...q.hospede },
-            status: "hospedada",
-            valorConsumido: q.valorConsumido || 0,
-            criadaEm: agora,
-            checkinEm: agora,
-            finalizadaEm: null,
-        }));
-    return { versao: 2, proximoId: id, reservas, produtos: salvo.produtos };
-}
-
-/** Reservas criadas antes das datas ganham um período coerente com o status delas. */
-function completarDatas(r) {
-    if (dataValida(r.entrada) && dataValida(r.saida)) return;
-    const dia = hoje();
-    if (r.status === "finalizada") {
-        r.entrada = diaDe(r.checkinEm || r.criadaEm) || dia;
-        const saida = diaDe(r.finalizadaEm) || dia;
-        r.saida = saida > r.entrada ? saida : somarDias(r.entrada, 1);
-    } else if (r.status === "hospedada") {
-        r.entrada = diaDe(r.checkinEm) || dia;
-        if (r.entrada > dia) r.entrada = dia;
-        r.saida = somarDias(dia, 1);
-    } else {
-        r.entrada = dia;
-        r.saida = somarDias(dia, 1);
-    }
-}
-
-/** Código de reserva: número único e sequencial, com 4 dígitos (0001, 0002...). Nunca é reaproveitado. */
-const gerarCodigo = (id) => String(id).padStart(4, "0");
-
-function carregar() {
+/** Busca no servidor tudo o que as páginas mostram. Lança um Error com a mensagem do problema. */
+async function carregarEstado() {
+    let resposta;
     try {
-        const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (salvo && Array.isArray(salvo.produtos)) {
-            const atual = migrar(salvo);
-            if (Array.isArray(atual.reservas)) {
-                // Reservas criadas antes do código de reserva recebem um a partir do id.
-                atual.reservas.forEach((r) => { if (!r.codigo) r.codigo = gerarCodigo(r.id); });
-                atual.reservas.forEach(completarDatas);
-                return atual;
-            }
-        }
-    } catch (e) { /* storage indisponível ou corrompido */ }
-    return estadoInicial();
+        resposta = await fetch(`${API}/estado`, { cache: "no-store" });
+    } catch (e) {
+        throw new Error(SEM_CONEXAO);
+    }
+    const dados = await resposta.json().catch(() => null);
+    if (!resposta.ok || !dados || !Array.isArray(dados.reservas)) {
+        throw new Error((dados && dados.msg) || `O servidor respondeu com erro (${resposta.status}).`);
+    }
+    estado = dados;
 }
-
-function salvar() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(estado)); } catch (e) { /* ignora */ }
-}
-
-let estado = carregar();
 
 /* ---------- Consultas ---------- */
 
 const ativa = (r) => r.status !== "finalizada";
-const quartoValido = (n) => Number.isInteger(n) && n >= 1 && n <= TOTAL_QUARTOS;
+const numerosDosQuartos = () => estado.quartos.map((q) => q.numero);
+const quartoValido = (n) => estado.quartos.some((q) => q.numero === n);
+
+/** Andar do quarto, como está gravado no banco. */
+function andar(numero) {
+    const q = estado.quartos.find((x) => x.numero === numero);
+    return q ? q.andar : Math.ceil(numero / QUARTOS_POR_ANDAR);
+}
+/** Andares que existem, do 1º para cima. */
+const andares = () => [...new Set(estado.quartos.map((q) => q.andar))].sort((a, b) => a - b);
 const buscarReserva = (id) => estado.reservas.find((r) => r.id === id) || null;
 const comStatus = (status) => estado.reservas.filter((r) => r.status === status);
 const porQuarto = (a, b) => a.quarto - b.quarto;
 const porCodigo = (a, b) => parseInt(a.codigo, 10) - parseInt(b.codigo, 10);
 const porEntrada = (a, b) => a.entrada.localeCompare(b.entrada);
-
-/** Reserva com hóspede dentro do quarto agora (no máximo uma por quarto). */
-const hospedadaDoQuarto = (numero) => estado.reservas.find((r) => r.quarto === numero && r.status === "hospedada") || null;
 
 /**
  * Primeira reserva ativa do quarto que se sobrepõe ao período [entrada, saída).
@@ -146,9 +98,7 @@ function conflito(numero, entrada, saida, ignorarId = null) {
 
 /** Quartos sem nenhuma reserva ativa no período. */
 function quartosDisponiveis(entrada, saida, ignorarId = null) {
-    const lista = [];
-    for (let n = 1; n <= TOTAL_QUARTOS; n++) if (!conflito(n, entrada, saida, ignorarId)) lista.push(n);
-    return lista;
+    return numerosDosQuartos().filter((n) => !conflito(n, entrada, saida, ignorarId));
 }
 
 /**
@@ -159,8 +109,7 @@ function quartosDisponiveis(entrada, saida, ignorarId = null) {
  */
 function quartos() {
     const dia = hoje();
-    return Array.from({ length: TOTAL_QUARTOS }, (_, i) => {
-        const numero = i + 1;
+    return numerosDosQuartos().map((numero) => {
         const ativas = estado.reservas.filter((r) => ativa(r) && r.quarto === numero).sort(porEntrada);
         const reserva = ativas.find((r) => r.status === "hospedada")
             || ativas.find((r) => r.status === "agendada" && r.entrada <= dia && dia < r.saida)
@@ -179,128 +128,70 @@ function erroDePeriodo(entrada, saida, exigirFuturo) {
     return null;
 }
 
-const descreverConflito = (c) =>
-    `O quarto ${c.quarto} já está reservado de ${dataCurta(c.entrada)} a ${dataCurta(c.saida)} (reserva #${c.codigo}).`;
-
-/* ---------- Regras ---------- */
+/* ---------- Alterações (enviadas para o servidor Java, que grava no banco) ---------- */
 
 const ok = (msg) => ({ ok: true, msg });
 const erro = (msg) => ({ ok: false, msg });
-const agora = () => new Date().toISOString();
 
-function reservar(numero, nome, email, telefone, entrada, saida) {
-    if (!quartoValido(numero)) return erro("Escolha um quarto válido.");
-    const problema = erroDePeriodo(entrada, saida, true);
-    if (problema) return erro(problema);
-    const c = conflito(numero, entrada, saida);
-    if (c) return erro(descreverConflito(c));
-    if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
-    const id = estado.proximoId++;
-    const codigo = gerarCodigo(id);
-    estado.reservas.push({
-        id,
-        codigo,
-        quarto: numero,
-        hospede: { nome, email, telefone },
-        status: "agendada",
-        entrada,
-        saida,
-        valorConsumido: 0,
-        criadaEm: agora(),
-        checkinEm: null,
-        finalizadaEm: null,
-    });
-    return ok(`Reserva #${codigo} criada no quarto ${numero}, de ${dataCurta(entrada)} a ${dataCurta(saida)} · Agendado.`);
-}
-
-function fazerCheckin(id) {
-    const r = buscarReserva(id);
-    if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem fazer check-in.");
-    if (hoje() < r.entrada) return erro(`O check-in desta reserva é a partir de ${dataCurta(r.entrada)}.`);
-    const ocupante = hospedadaDoQuarto(r.quarto);
-    if (ocupante) {
-        return erro(`O quarto ${r.quarto} ainda está com ${ocupante.hospede.nome} (reserva #${ocupante.codigo}). Encerre essa estadia antes.`);
+/**
+ * Envia uma alteração para a API. O Java confere as regras (quarto livre, datas,
+ * estoque...) e grava no PostgreSQL; aqui só mostramos a mensagem que ele devolve.
+ * Sempre que o servidor responde, os dados são recarregados do banco, para a tela
+ * ficar igual ao que está gravado (inclusive mudanças feitas por outra pessoa).
+ * Devolve { ok, msg }.
+ */
+async function enviar(metodo, caminho, corpo) {
+    let resposta;
+    try {
+        resposta = await fetch(`${API}/${caminho}`, {
+            method: metodo,
+            headers: corpo === undefined ? {} : { "Content-Type": "application/json" },
+            body: corpo === undefined ? undefined : JSON.stringify(corpo),
+        });
+    } catch (e) {
+        return erro(SEM_CONEXAO);
     }
-    r.status = "hospedada";
-    r.checkinEm = agora();
-    return ok(`Check-in da reserva #${r.codigo} feito: ${r.hospede.nome} está no quarto ${r.quarto}.`);
+    const dados = await resposta.json().catch(() => null);
+    const resultado = dados && typeof dados.msg === "string"
+        ? { ok: resposta.ok && dados.ok === true, msg: dados.msg }
+        : erro(`O servidor respondeu com erro (${resposta.status}).`);
+    try { await carregarEstado(); } catch (e) { /* a tela atualiza na próxima vez */ }
+    return resultado;
 }
 
-function cancelarAgendamento(id) {
-    const r = buscarReserva(id);
-    if (!r || r.status !== "agendada") return erro("Só reservas com status Agendado podem ser canceladas.");
-    estado.reservas = estado.reservas.filter((x) => x !== r);
-    return ok(`Reserva #${r.codigo} cancelada. O quarto ${r.quarto} está livre.`);
-}
+/** Nova reserva com o status Agendado. */
+const reservar = (numero, nome, email, telefone, entrada, saida) =>
+    enviar("POST", "reservas", { quarto: numero, nome, email, telefone, entrada, saida });
 
-/** Encerra a estadia. Com consumo no frigobar, exige a confirmação do pagamento. */
-function finalizarReserva(id, pagamentoConfirmado) {
-    const r = buscarReserva(id);
-    if (!r || r.status !== "hospedada") return erro("Só reservas com hóspede no hotel podem ser encerradas.");
-    if (r.valorConsumido > 0 && !pagamentoConfirmado) return erro("Confirme o pagamento do frigobar para encerrar.");
-    r.status = "finalizada";
-    r.finalizadaEm = agora();
-    // Saiu antes do previsto: o histórico guarda a data real de saída.
-    if (hoje() < r.saida && hoje() > r.entrada) r.saida = hoje();
-    return ok(`Reserva #${r.codigo} encerrada · Finalizado.`);
-}
+const fazerCheckin = (id) => enviar("POST", `reservas/${id}/checkin`);
+
+const cancelarAgendamento = (id) => enviar("DELETE", `reservas/${id}`);
+
+/** Encerra a estadia. Com consumo no frigobar, o servidor exige a confirmação do pagamento. */
+const finalizarReserva = (id, pagamentoConfirmado) =>
+    enviar("POST", `reservas/${id}/finalizar`, { pagamentoConfirmado });
 
 /**
  * Atualiza hóspede, quarto e datas. Com hóspede no hotel, a data de entrada não muda
  * (só dá para mudar a saída, por exemplo para estender a estadia).
  */
-function editarReserva(id, novoQuarto, nome, email, telefone, entrada, saida) {
-    const r = buscarReserva(id);
-    if (!r || !ativa(r)) return erro("Essa reserva não pode mais ser editada.");
-    if (!nome || !email || !telefone) return erro("Preencha nome, e-mail e telefone.");
-    if (!quartoValido(novoQuarto)) return erro("Escolha um quarto válido.");
-    if (r.status === "hospedada") entrada = r.entrada;
-    const problema = erroDePeriodo(entrada, saida, entrada !== r.entrada);
-    if (problema) return erro(problema);
-    if (r.status === "hospedada" && novoQuarto !== r.quarto && hospedadaDoQuarto(novoQuarto)) {
-        return erro(`O quarto ${novoQuarto} está com outro hóspede agora.`);
-    }
-    const c = conflito(novoQuarto, entrada, saida, r.id);
-    if (c) return erro(descreverConflito(c));
-
-    const trocou = novoQuarto !== r.quarto;
-    r.hospede = { nome, email, telefone };
-    r.quarto = novoQuarto;
-    r.entrada = entrada;
-    r.saida = saida;
-    return ok(trocou ? `Reserva #${r.codigo}: ${nome} foi para o quarto ${novoQuarto}.` : `Reserva #${r.codigo} atualizada.`);
-}
+const editarReserva = (id, quarto, nome, email, telefone, entrada, saida) =>
+    enviar("PUT", `reservas/${id}`, { quarto, nome, email, telefone, entrada, saida });
 
 /**
  * Lança vários produtos de uma vez na reserva hospedada do quarto.
- * itens: [{ indice, quantidade }]. Valida tudo antes; se algo falhar, nada é lançado.
+ * itens: [{ indice, quantidade }], com o índice do produto em estado.produtos.
+ * O servidor confere tudo antes; se algo falhar, nada é lançado.
  */
 function registrarConsumo(numero, itens) {
-    const r = hospedadaDoQuarto(numero);
-    if (!r) return erro("Escolha um quarto com hóspede no hotel.");
-    const validos = itens.filter((i) => i.quantidade > 0);
-    if (!validos.length) return erro("Adicione pelo menos um produto.");
-
-    for (const { indice, quantidade } of validos) {
-        const produto = estado.produtos[indice];
-        if (!produto) return erro("Produto inválido.");
-        if (!Number.isInteger(quantidade) || quantidade > produto.quantidade) {
-            return erro(`${produto.nomeProduto}: só há ${produto.quantidade} em estoque.`);
-        }
-    }
-
-    let valor = 0;
-    let unidades = 0;
-    for (const { indice, quantidade } of validos) {
-        const produto = estado.produtos[indice];
-        produto.quantidade -= quantidade;
-        valor += produto.preco * quantidade;
-        unidades += quantidade;
-    }
-    r.valorConsumido += valor;
-    const rotulo = unidades === 1 ? "1 item" : `${unidades} itens`;
-    return ok(`${rotulo} lançados no quarto ${numero} · ${brl(valor)}.`);
+    return enviar("POST", "consumos", {
+        quarto: numero,
+        itens: itens.map(({ indice, quantidade }) => ({ produtoId: estado.produtos[indice].id, quantidade })),
+    });
 }
+
+/** Apaga reservas e hóspedes do banco e restaura o estoque do frigobar. */
+const redefinirDados = () => enviar("POST", "redefinir");
 
 /* ---------- Utilidades ---------- */
 
@@ -321,7 +212,6 @@ function textoEstadia(entrada, saida) {
     return `${n} ${n === 1 ? "noite" : "noites"} · ${dataCurta(entrada)} → ${dataCurta(saida)}`;
 }
 const $ = (id) => document.getElementById(id);
-const andar = (numero) => Math.ceil(numero / QUARTOS_POR_ANDAR);
 const parametro = (nome) => new URLSearchParams(location.search).get(nome);
 
 function el(tag, texto, classe) {
@@ -371,16 +261,29 @@ function avisar(resultado) {
     timerToast = setTimeout(() => toast.classList.remove("visivel"), 3200);
 }
 
-/** Liga um formulário a uma ação; salva e re-renderiza quando dá certo. */
+/** Desativa o botão enquanto espera o servidor, para o pedido não ser enviado duas vezes. */
+async function aguardando(botao, acao) {
+    botao.disabled = true;
+    try {
+        return await acao();
+    } finally {
+        botao.disabled = false;
+    }
+}
+
+/** Liga um formulário a uma ação no servidor; limpa o formulário quando dá certo e re-renderiza. */
 function ligar(form, acao, aoTerminar) {
-    form.addEventListener("submit", (ev) => {
+    const botao = form.querySelector("button[type=submit]");
+    let enviando = false;
+    form.addEventListener("submit", async (ev) => {
         ev.preventDefault();
-        const resultado = acao(Object.fromEntries(new FormData(form)));
+        if (enviando) return;
+        enviando = true;
+        const dados = Object.fromEntries(new FormData(form));
+        const resultado = await aguardando(botao, () => acao(dados));
+        enviando = false;
         avisar(resultado);
-        if (resultado.ok) {
-            salvar();
-            form.reset();
-        }
+        if (resultado.ok) form.reset();
         aoTerminar(resultado);
     });
 }
@@ -388,6 +291,11 @@ function ligar(form, acao, aoTerminar) {
 /* ---------- Página: Home ---------- */
 
 function paginaInicio() {
+    renderInicio();
+    return renderInicio;
+}
+
+function renderInicio() {
     const qs = quartos();
     const total = qs.length;
     const reservados = qs.filter((q) => q.reserva).length;
@@ -633,15 +541,15 @@ function paginaQuartos() {
             return;
         }
 
-        const totalAndares = Math.ceil(qs.length / QUARTOS_POR_ANDAR);
-        for (let a = 1; a <= totalAndares; a++) { // 1º andar em cima
+        for (const a of andares()) { // 1º andar em cima
             const doAndar = visiveis.filter((q) => andar(q.numero) === a);
             if (!doAndar.length) continue;
 
-            const livresNoAndar = qs.filter((q) => andar(q.numero) === a && !q.reserva).length;
+            const noAndar = qs.filter((q) => andar(q.numero) === a);
+            const livresNoAndar = noAndar.filter((q) => !q.reserva).length;
             const bloco = el("section", undefined, "andar");
             const rotulo = el("div", undefined, "andar-rotulo");
-            rotulo.append(el("h2", `${a}º andar`), el("span", `${livresNoAndar} de ${QUARTOS_POR_ANDAR} livres`));
+            rotulo.append(el("h2", `${a}º andar`), el("span", `${livresNoAndar} de ${noAndar.length} livres`));
             const grade = el("div", undefined, "grade-quartos");
 
             for (const q of doAndar) grade.append(cartaoQuarto(q));
@@ -678,6 +586,7 @@ function paginaQuartos() {
     }
 
     render();
+    return render;
 }
 
 /* ---------- Página: Reservas ---------- */
@@ -788,28 +697,29 @@ function paginaReservas() {
         atualizarQuartosEdicao(r);
     }));
 
-    formEditar.addEventListener("submit", (ev) => {
+    formEditar.addEventListener("submit", async (ev) => {
         ev.preventDefault();
-        if (aberta === null) return;
+        const id = aberta;
+        if (id === null) return;
         const d = Object.fromEntries(new FormData(formEditar));
-        const atual = buscarReserva(aberta);
-        const r = editarReserva(aberta, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim(),
-            d.entrada || atual.entrada, d.saida);
+        const atual = buscarReserva(id);
+        // Depois do check-in o campo de entrada fica desativado e não vem no formulário.
+        const entrada = d.entrada || (atual ? atual.entrada : "");
+        const r = await aguardando(formEditar.querySelector("button[type=submit]"), () =>
+            editarReserva(id, parseInt(d.numero, 10), d.nome.trim(), d.email.trim(), d.telefone.trim(), entrada, d.saida));
         avisar(r);
-        if (!r.ok) return;
-        salvar();
-        fecharDialogo();
         render();
+        if (r.ok) fecharDialogo();
     });
 
-    $("fazer-checkin").addEventListener("click", () => {
+    $("fazer-checkin").addEventListener("click", async () => {
         const id = aberta;
-        const r = fazerCheckin(id);
+        const r = await aguardando($("fazer-checkin"), () => fazerCheckin(id));
         avisar(r);
-        if (!r.ok) return;
-        salvar();
         render();
-        abrirReserva(buscarReserva(id)); // continua aberta, agora como hospedada
+        // Continua aberta, agora como hospedada (ou com os dados atuais, se deu erro).
+        const atualizada = buscarReserva(id);
+        if (atualizada && dialogo.open && aberta === id) abrirReserva(atualizada);
     });
 
     /* ----- Diálogo: confirmação (encerrar com pagamento ou cancelar agendamento) ----- */
@@ -861,21 +771,23 @@ function paginaReservas() {
     });
 
     $("confirmar-voltar").addEventListener("click", () => {
-        if (!confirmacaoVeioDaEdicao) return fecharDialogo();
-        abrirReserva(buscarReserva(aberta));
+        const r = buscarReserva(aberta);
+        if (!confirmacaoVeioDaEdicao || !r) return fecharDialogo();
+        abrirReserva(r);
         botaoPerigo.focus();
     });
 
-    botaoConfirmar.addEventListener("click", () => {
-        if (aberta === null) return;
-        const r = acaoPendente === "cancelar"
-            ? cancelarAgendamento(aberta)
-            : finalizarReserva(aberta, pagamentoOk.checked);
+    botaoConfirmar.addEventListener("click", async () => {
+        const id = aberta;
+        if (id === null) return;
+        const cancelar = acaoPendente === "cancelar";
+        const pago = pagamentoOk.checked;
+        const r = await aguardando(botaoConfirmar, () => (cancelar ? cancelarAgendamento(id) : finalizarReserva(id, pago)));
         avisar(r);
-        if (!r.ok) return;
-        salvar();
-        fecharDialogo();
         render();
+        if (r.ok) fecharDialogo();
+        // Se deu erro, o botão volta ao estado da caixa de pagamento.
+        else if (!cancelar) botaoConfirmar.disabled = $("pagamento-checagem").hidden ? false : !pagamentoOk.checked;
     });
 
     /* ----- Lista de reservas ----- */
@@ -1000,8 +912,7 @@ function paginaReservas() {
     const barraFiltros = document.querySelector(".filtros-reservas");
     const barraAbas = document.querySelector(".abas-status");
 
-    const totalAndares = Math.ceil(TOTAL_QUARTOS / QUARTOS_POR_ANDAR);
-    for (let a = 1; a <= totalAndares; a++) filtroAndar.append(opcao(a, `${a}º andar`));
+    for (const a of andares()) filtroAndar.append(opcao(a, `${a}º andar`));
 
     abas.forEach((b) => b.addEventListener("click", () => {
         filtroStatus = b.dataset.status;
@@ -1135,6 +1046,7 @@ function paginaReservas() {
         atualizarNovaReserva();
         formReservar.elements.nome.focus();
     }
+    return render;
 }
 
 /* ---------- Página: Frigobar ---------- */
@@ -1300,10 +1212,12 @@ function paginaFrigobar() {
 
     const pedido = parametro("quarto");
     if (pedido && [...selQuarto.options].some((o) => o.value === pedido)) selQuarto.value = pedido;
+    return render;
 }
 
 /* ---------- Inicialização ---------- */
 
+// Cada página monta a tela e devolve a função que a redesenha com dados novos.
 const paginas = {
     inicio: paginaInicio,
     quartos: paginaQuartos,
@@ -1311,18 +1225,52 @@ const paginas = {
     frigobar: paginaFrigobar,
 };
 
-document.querySelectorAll(".nav a").forEach((a) => {
-    if (a.dataset.nav === document.body.dataset.page) a.setAttribute("aria-current", "page");
-});
+/** Sem dados do banco, a página mostra só o aviso e um botão para tentar de novo. */
+function mostrarFalha(mensagem) {
+    const container = document.querySelector("main .container");
+    for (const filho of container.children) filho.hidden = true;
+    const caixa = el("div", undefined, "vazio falha-conexao");
+    caixa.setAttribute("role", "alert");
+    const tentar = el("button", "Tentar novamente", "botao");
+    tentar.type = "button";
+    tentar.addEventListener("click", () => location.reload());
+    caixa.append(el("p", "Não foi possível carregar os dados do banco de dados.", "falha-titulo"), el("p", mensagem), tentar);
+    container.prepend(caixa);
+}
 
-const botaoRedefinir = $("redefinir");
-if (botaoRedefinir) {
-    botaoRedefinir.addEventListener("click", () => {
-        if (!confirm("Apagar todas as reservas e restaurar o estoque do frigobar?")) return;
-        estado = estadoInicial();
-        salvar();
-        location.reload();
+async function iniciar() {
+    document.querySelectorAll(".nav a").forEach((a) => {
+        if (a.dataset.nav === document.body.dataset.page) a.setAttribute("aria-current", "page");
+    });
+
+    const botaoRedefinir = $("redefinir");
+    if (botaoRedefinir) {
+        botaoRedefinir.addEventListener("click", async () => {
+            if (!confirm("Apagar todas as reservas e hóspedes do banco de dados e restaurar o estoque do frigobar?")) return;
+            const r = await aguardando(botaoRedefinir, redefinirDados);
+            if (r.ok) location.reload();
+            else avisar(r);
+        });
+    }
+
+    const pagina = paginas[document.body.dataset.page];
+    if (!pagina) return;
+    try {
+        await carregarEstado();
+    } catch (e) {
+        mostrarFalha(e.message);
+        return;
+    }
+    const redesenhar = pagina();
+
+    // Ao voltar para esta aba, busca de novo no banco: outra pessoa pode ter mudado algo.
+    document.addEventListener("visibilitychange", async () => {
+        if (document.visibilityState !== "visible") return;
+        try {
+            await carregarEstado();
+            redesenhar();
+        } catch (e) { /* mantém a tela como está; a próxima ação mostra o erro */ }
     });
 }
 
-(paginas[document.body.dataset.page] || (() => {}))();
+iniciar();

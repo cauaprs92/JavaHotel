@@ -1,7 +1,9 @@
 package com.hotel.model;
 
+/** Pessoa que se hospeda. Tabela: hospede. */
 public class Hospede {
 
+    private int id;
     private String nome;
     private String email;
     private String telefone;
@@ -13,6 +15,14 @@ public class Hospede {
         this.nome = nome;
         this.email = email;
         this.telefone = telefone;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     public String getNome() {

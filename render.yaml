@@ -1,0 +1,14 @@
+# Render Blueprint: cria o serviço web do JavaHotel a partir do Dockerfile.
+# Os valores do banco (Neon ou outro PostgreSQL) são pedidos na hora de criar.
+services:
+  - type: web
+    name: javahotel
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false

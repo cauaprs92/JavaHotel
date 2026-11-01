@@ -1,48 +1,35 @@
 package com.hotel.model;
 
+/**
+ * Quarto do hotel. Tabela: quarto.
+ * Se ele está livre, agendado ou hospedado depende das reservas, não do quarto.
+ */
 public class Quarto {
 
     private int numero;
-    private boolean ocupado;
-    private Hospede hospede;
-    private double valorConsumido;
+    private int andar;
 
-    public Quarto(int numero) {
+    public Quarto() {
+    }
+
+    public Quarto(int numero, int andar) {
         this.numero = numero;
-        this.ocupado = false;
-        this.hospede = null;
-        this.valorConsumido = 0.0;
+        this.andar = andar;
     }
 
     public int getNumero() {
         return numero;
     }
 
-    public boolean isOcupado() {
-        return ocupado;
+    public void setNumero(int numero) {
+        this.numero = numero;
     }
 
-    public Hospede getHospede() {
-        return hospede;
+    public int getAndar() {
+        return andar;
     }
 
-    public double getValorConsumido() {
-        return valorConsumido;
-    }
-
-    public void reservar(Hospede hospede) {
-        this.hospede = hospede;
-        this.ocupado = true;
-        this.valorConsumido = 0.0;
-    }
-
-    public void cancelarReserva() {
-        this.hospede = null;
-        this.ocupado = false;
-        this.valorConsumido = 0.0;
-    }
-
-    public void adicionarConsumo(double valor) {
-        this.valorConsumido += valor;
+    public void setAndar(int andar) {
+        this.andar = andar;
     }
 }

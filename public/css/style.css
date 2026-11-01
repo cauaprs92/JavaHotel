@@ -584,6 +584,10 @@ main {
 
 .vazio p { margin: 0 0 16px; }
 
+/* Sem conexão com o servidor / banco de dados */
+.falha-conexao { margin-top: 32px; }
+.falha-conexao .falha-titulo { color: var(--ink); font-weight: 600; margin-bottom: 6px; }
+
 /* ---------- Quartos ---------- */
 
 .barra-filtros {

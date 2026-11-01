@@ -1,18 +1,31 @@
 package com.hotel.model;
 
+import java.math.BigDecimal;
+
+/** Produto do frigobar com o estoque atual. Tabela: produto. */
 public class ProdutoFrigobar {
 
+    private int id;
     private String nomeProduto;
-    private double preco;
+    private BigDecimal preco;
     private int quantidade;
 
     public ProdutoFrigobar() {
     }
 
-    public ProdutoFrigobar(String nomeProduto, double preco, int quantidade) {
+    public ProdutoFrigobar(int id, String nomeProduto, BigDecimal preco, int quantidade) {
+        this.id = id;
         this.nomeProduto = nomeProduto;
         this.preco = preco;
         this.quantidade = quantidade;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     public String getNomeProduto() {
@@ -23,11 +36,11 @@ public class ProdutoFrigobar {
         this.nomeProduto = nomeProduto;
     }
 
-    public double getPreco() {
+    public BigDecimal getPreco() {
         return preco;
     }
 
-    public void setPreco(double preco) {
+    public void setPreco(BigDecimal preco) {
         this.preco = preco;
     }
 
@@ -39,7 +52,7 @@ public class ProdutoFrigobar {
         this.quantidade = quantidade;
     }
 
-    public double calcularTotal(int qtdConsumida) {
-        return preco * qtdConsumida;
+    public BigDecimal calcularTotal(int qtdConsumida) {
+        return preco.multiply(BigDecimal.valueOf(qtdConsumida));
     }
 }
