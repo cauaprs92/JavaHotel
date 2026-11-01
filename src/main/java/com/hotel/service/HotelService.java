@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,9 @@ public class HotelService {
     // Mesmos limites das colunas da tabela hospede.
     private static final int MAX_NOME = 120;
     private static final int MAX_EMAIL = 160;
-    private static final int MAX_TELEFONE = 40;
+
+    /** Celular "(11) 90000-0000" (começa com 9) ou fixo "(11) 3000-0000" (começa com 2 a 5), DDD de 11 a 99. */
+    private static final Pattern TELEFONE = Pattern.compile("\\([1-9]\\d\\) (9\\d{4}|[2-5]\\d{3})-\\d{4}");
 
     private final ConexaoBD conexaoBD;
     private final InicializadorBD inicializadorBD;
@@ -276,7 +279,7 @@ public class HotelService {
         if (nome.isEmpty() || email.isEmpty() || telefone.isEmpty()) throw erro("Preencha nome, e-mail e telefone.");
         if (nome.length() > MAX_NOME) throw erro("O nome pode ter até " + MAX_NOME + " caracteres.");
         if (email.length() > MAX_EMAIL || !email.matches("[^@\\s]+@[^@\\s]+")) throw erro("Informe um e-mail válido.");
-        if (telefone.length() > MAX_TELEFONE) throw erro("O telefone pode ter até " + MAX_TELEFONE + " caracteres.");
+        if (!TELEFONE.matcher(telefone).matches()) throw erro("Informe um telefone válido, como (11) 90000-0000.");
         return new Hospede(nome, email, telefone);
     }
 
